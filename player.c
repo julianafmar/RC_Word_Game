@@ -8,7 +8,11 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <stdio.h>
-#define PORT "58001"
+
+#define DEFAULT_GSIP ""
+#define DEFAULT_GSport "" 
+#define PORT_SIZE 16
+#define IP_SIZE 64
 
 int tcp_fd, udp_fd, errcode;
 ssize_t n;
@@ -17,14 +21,26 @@ struct addrinfo udp_hints, tcp_hints, *udp_res, *tcp_res;
 struct sockaddr_in addr;
 char buffer[128];
 
-char *start(char plid);
-char *play(char letter);
-void received_udp(char received);
-void received_tcp(char received);
+char start(char plid);
+char play(char letter);
+void received_udp(char *received);
+void received_tcp(char *received);
 
-
-int main(char args){
+int main(int argc, char *argv[]){
     //arg tem default com IPaddress e PORT
+    
+    char GSport[PORT_SIZE], GSIP[IP_SIZE];
+    strcpy(GSport, DEFAULT_GSport);
+    strcpy(GSIP, DEFAULT_GSIP);
+
+    for(int i = 0; i < argc - 1; i++){
+        if(strcmp(argv[i], "-p") == 0){
+            strcpy(GSport, argv[i+1]);
+        }
+        if(strcmp(argv[i], "-n") == 0){
+            strcpy(GSIP, argv[i+1]);
+        }
+    }
 
     char input[30], *command;
     char send[30];
@@ -37,7 +53,7 @@ int main(char args){
     udp_hints.ai_family = AF_INET;
     udp_hints.ai_socktype = SOCK_DGRAM;
 
-    errcode = getaddrinfo("tejo.tecnico.ulisboa.pt", PORT, &udp_hints, &udp_res);
+    errcode = getaddrinfo("tejo.tecnico.ulisboa.pt", GSport, &udp_hints, &udp_res);
     if(errcode != 0) exit(1);
     
     //tcp
@@ -48,20 +64,23 @@ int main(char args){
     tcp_hints.ai_family = AF_INET;
     tcp_hints.ai_socktype = SOCK_STREAM;
 
-    errcode = getaddrinfo("tejo.tecnico.ulisboa.pt", PORT, &tcp_hints, &tcp_res);
+    errcode = getaddrinfo("tejo.tecnico.ulisboa.pt", GSport, &tcp_hints, &tcp_res);
     if(errcode != 0) exit(1);
-    
+    char aux;
+
     for(;;){
         fgets(input, 30 + 1, stdin);
         command = strtok(input, " \t\n");
         int t_u = -1;
         
         if(strcmp(command, "start") == 0|| strcmp(command, "sg") == 0){
-            send = start(input + strlen(command) + 1);
+            aux = start(*command);
+            strcpy(send, &aux);
             t_u = 1;
         } 
         else if(strcmp(command, "play") == 0|| strcmp(command, "pl") == 0){
-            send = play(input);
+            //aux = play(*input);
+            //strcpy(send, play(*input));
             t_u = 1;
         }
         else if(strcmp(command, "guess")== 0 || strcmp(command, "gw") == 0){
@@ -106,19 +125,22 @@ int main(char args){
 
             received_udp(buffer);
         }
-        
+        memset(buffer,0,strlen(buffer));
+        memset(send,0,strlen(send));
+        memset(input,0,strlen(input));
     }
 
     return 0;
 }
 
-char *start(char plid){
-    char *out;
-    out = strcat("SNG", plid);
-    return out;
+char start(char plid){
+    char out[30];
+    strcpy(out,  "SNG");
+    strcat(out, &plid);
+    return *out;
 }
 
-void received_udp(char received){
+void received_udp(char *received){
     char *command = strtok(received, " \t\n");
     if(strcmp(command, "RSG") == 0){
         // que acontece quando status é NOK? não tendo n_letters nem max_errors, será que envia a palavra do jogo não finaalizado?
@@ -126,6 +148,6 @@ void received_udp(char received){
     //função que trata dos prints visiveis para o player
 }
 
-void received_tcp(char received){
+void received_tcp(char *received){
     
 }
