@@ -10,14 +10,15 @@
 #include <stdio.h>
 
 #define WHITESPACE " "
-#define INPUT_SIZE 30
 #define DEFAULT_GSIP "tejo.tecnico.ulisboa.pt"
 #define DEFAULT_GSport "58033"
+#define INPUT_SIZE 30
 #define PORT_SIZE 16
 #define IP_SIZE 64
+#define PLID_SIZE 7
 
 int tcp_fd, udp_fd, errcode;
-char id[7];
+char id[PLID_SIZE];
 ssize_t n;
 socklen_t addrlen;
 struct addrinfo udp_hints, tcp_hints, *udp_res, *tcp_res;
@@ -25,7 +26,7 @@ struct sockaddr_in addr;
 char buffer[128];
 int n_trials = 0;
 
-char start(char plid);
+char start(char plid[]);
 char play(char letter);
 char guess(char word);
 void communication_upd(char *send);
@@ -75,38 +76,44 @@ int main(int argc, char *argv[]){
 
     for(;;){
         fgets(input, INPUT_SIZE, stdin);
-        command = strtok(input, " \n");
+
+		char *token_list[7];
+		char *tok = strtok(input, " \n");
+		for (int i = 0; tok != NULL && i < 7; i++){
+			token_list[i] = tok;
+			tok = strtok(NULL, " \n");
+		}
         int t_u = -1;
         
-        if(strcmp(command, "start") == 0 || strcmp(command, "sg") == 0){
-            aux = start(*(input + strlen(command)));
+        if(strcmp(token_list[0], "start") == 0 || strcmp(token_list[0], "sg") == 0){
+            aux = start(token_list[1]);
             strcpy(send, &aux);
             t_u = 1;
         } 
-        else if(strcmp(command, "play") == 0 || strcmp(command, "pl") == 0){
-            aux = play(*input + strlen(command));
+        else if(strcmp(token_list[0], "play") == 0 || strcmp(token_list[0], "pl") == 0){
+            aux = play(*token_list[1]);
             strcpy(send, &aux);
             n_trials++;
             t_u = 1;
         }
-        else if(strcmp(command, "guess")== 0 || strcmp(command, "gw") == 0){
-            aux = guess(*(input + strlen(command)));
+        else if(strcmp(token_list[0], "guess")== 0 || strcmp(token_list[0], "gw") == 0){
+            aux = guess(*token_list[1]);
             n_trials++;
             t_u = 1;
         }
-        else if(strcmp(command, "scorebord") == 0 || strcmp(command, "sb") == 0){
+        else if(strcmp(token_list[0], "scorebord") == 0 || strcmp(token_list[0], "sb") == 0){
             t_u = 0;
         }
-        else if(strcmp(command, "hint") == 0 || strcmp(command, "h") == 0){
+        else if(strcmp(token_list[0], "hint") == 0 || strcmp(token_list[0], "h") == 0){
             t_u = 0;
         }
-        else if(strcmp(command, "state") == 0 || strcmp(command, "st") == 0){
+        else if(strcmp(token_list[0], "state") == 0 || strcmp(token_list[0], "st") == 0){
             t_u = 0;
         }
-        else if(strcmp(command, "quit") == 0){
+        else if(strcmp(token_list[0], "quit") == 0){
             t_u = 1;
         }
-        else if(strcmp(command, "exit") == 0){
+        else if(strcmp(token_list[0], "exit") == 0){
             t_u = 1;
         }
 
@@ -127,11 +134,11 @@ int main(int argc, char *argv[]){
     return 0;
 }
 
-char start(char plid){
-    char out[INPUT_SIZE];
+char start(char plid[]){
+    char out[50];
     strcpy(out,  "SNG ");
-    strcat(out, &plid);
-    strcpy(id, &plid);
+    strcat(out, plid);
+    strcpy(id, plid);
     return *out;
 }
 
@@ -144,6 +151,7 @@ char play(char letter){
     strcat(out, &letter);
     sprintf(str, " %d", n_trials);
     strcat(out, str);
+    printf("%s", out);
     return *out;
 }
 
