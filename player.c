@@ -25,6 +25,8 @@ struct addrinfo udp_hints, tcp_hints, *udp_res, *tcp_res;
 struct sockaddr_in addr;
 char buffer[128];
 int n_trials = 0;
+int max_errors;
+int n_letters;
 
 void start(char plid[]);
 void play(char letter);
@@ -178,12 +180,29 @@ void received_udp(char *received){
         tok = strtok(NULL, " \n");
     }
     if(strcmp(token_list[0], "RSG") == 0){
-        if(strcmp(token_list[1], "NOK") == 0){}
+        if(strcmp(token_list[1], "NOK") == 0){
+        }
         // que acontece quando status é NOK? não tendo n_letters nem max_errors, será que envia a palavra do jogo não finalizado?
-        if(strcmp(token_list[1], "OK") == 0){}
+        if(strcmp(token_list[1], "OK") == 0){
+            max_errors = atoi(token_list[3]);
+            n_letters = atoi(token_list[2]);
+            char word_spaces[30];
+            memset(word_spaces, "_", n_letters);
+            printf("Your word has %s letters (max %s errors): %s", token_list[2], token_list[3], word_spaces);
+        }
         else printf("Something went wrong...");
     }
-    if(strcmp(token_list[0], "RLG") == 0){}
+    if(strcmp(token_list[0], "RLG") == 0){
+        if(strcmp(token_list[1], "OK") == 0){
+            
+        }
+        if(strcmp(token_list[1], "WIN") == 0){}
+        if(strcmp(token_list[1], "DUP") == 0){}
+        if(strcmp(token_list[1], "NOK") == 0){}
+        if(strcmp(token_list[1], "OVR") == 0){}
+        if(strcmp(token_list[1], "INV") == 0){}
+        if(strcmp(token_list[1], "ERR") == 0){}
+    }
     if(strcmp(token_list[0], "RWG") == 0){}
     else printf("Something went wrong...");
         
