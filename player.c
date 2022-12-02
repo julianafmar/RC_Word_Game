@@ -9,6 +9,7 @@
 #include <netdb.h>
 #include <stdio.h>
 
+#define UNDERSCORE "_"
 #define WHITESPACE " "
 #define DEFAULT_GSIP "tejo.tecnico.ulisboa.pt"
 #define DEFAULT_GSport "58033"
@@ -27,6 +28,8 @@ char buffer[128];
 int n_trials = 0;
 int max_errors;
 int n_letters;
+char word_spaces[30];
+char letter_try;
 
 void start(char plid[]);
 void play(char letter);
@@ -109,6 +112,7 @@ int main(int argc, char *argv[]){
 
         memset(buffer, 0, strlen(buffer));
         memset(input, 0, strlen(input));
+        letter_try = *"\0";
     }
 
     return 0;
@@ -131,7 +135,8 @@ void play(char letter){
     strcat(send, &letter);
     sprintf(str, " %d", n_trials);
     strcat(send, str);
-    n_trials++;
+    letter_try = letter;
+    n_trials++; //n_trials so aumenta qnd a msg é realmente recebida, temos de mudar isso
     communication_upd(send);
 }
 
@@ -173,7 +178,7 @@ void communication_tcp(char *send){
 }
 
 void received_udp(char *received){
-    char *token_list[5];
+    char *token_list[35];
     char *tok = strtok(received, " \n");
     for (int i = 0; tok != NULL && i < 5; i++){
         token_list[i] = tok;
@@ -181,29 +186,69 @@ void received_udp(char *received){
     }
     if(strcmp(token_list[0], "RSG") == 0){
         if(strcmp(token_list[1], "NOK") == 0){
+            // que acontece quando status é NOK? não tendo n_letters nem max_errors, será que envia a palavra do jogo não finalizado?
         }
-        // que acontece quando status é NOK? não tendo n_letters nem max_errors, será que envia a palavra do jogo não finalizado?
         if(strcmp(token_list[1], "OK") == 0){
             max_errors = atoi(token_list[3]);
             n_letters = atoi(token_list[2]);
-            char word_spaces[30];
-            memset(word_spaces, "_", n_letters);
-            printf("Your word has %s letters (max %s errors): %s", token_list[2], token_list[3], word_spaces);
+            memset(word_spaces, *UNDERSCORE, n_letters);
+            printf("New game started. Guess %s letter word (max %s errors): %s", token_list[2], token_list[3], word_spaces);
         }
         else printf("Something went wrong...");
     }
-    if(strcmp(token_list[0], "RLG") == 0){
+    else if(strcmp(token_list[0], "RLG") == 0){
         if(strcmp(token_list[1], "OK") == 0){
-            
+            int n = atoi(token_list[3]);
+            for(int i = 0; i < n; i++){
+                word_spaces[atoi(token_list[4+i])] = letter_try; /*temos de ir buscar a letra para por aqui. char global??*/
+            }
+            printf("Word: %s", word_spaces);
         }
-        if(strcmp(token_list[1], "WIN") == 0){}
-        if(strcmp(token_list[1], "DUP") == 0){}
-        if(strcmp(token_list[1], "NOK") == 0){}
-        if(strcmp(token_list[1], "OVR") == 0){}
-        if(strcmp(token_list[1], "INV") == 0){}
-        if(strcmp(token_list[1], "ERR") == 0){}
+        if(strcmp(token_list[1], "WIN") == 0){
+            printf("You won!");
+        }
+        if(strcmp(token_list[1], "DUP") == 0){
+            printf("You already tried this letter.");
+        }
+        if(strcmp(token_list[1], "NOK") == 0){
+            printf("nok"); //what is this?!?!
+        }
+        if(strcmp(token_list[1], "OVR") == 0){
+            printf("Game over.");
+        }
+        if(strcmp(token_list[1], "INV") == 0){
+            printf("inv"); //idk what to write here
+        }
+        if(strcmp(token_list[1], "ERR") == 0){
+            printf("err"); //idk what to write here either
+        }
     }
-    if(strcmp(token_list[0], "RWG") == 0){}
+    else if(strcmp(token_list[0], "RWG") == 0){
+        if(strcmp(token_list[1], "WIN") == 0){
+            printf("You won!");
+        }
+        if(strcmp(token_list[1], "NOK") == 0){
+            printf("nok"); //???
+        }
+        if(strcmp(token_list[1], "OVR") == 0){
+            printf("Game over.");
+        }
+        if(strcmp(token_list[1], "INV") == 0){
+            printf("inv"); //???
+        }
+        if(strcmp(token_list[1], "ERR") == 0){
+            printf("err"); //???
+        }
+    }
+    else if(strcmp(token_list[0], "RQT") == 0){
+        if(strcmp(token_list[1], "OK") == 0){
+            printf("ok"); //???
+        }
+        if(strcmp(token_list[1], "ERR") == 0){
+            printf("err"); //???
+        }
+    }
+    else if(strcmp(token_list[0], "RRV") == 0){}
     else printf("Something went wrong...");
         
     //função que trata dos prints visiveis para o player
