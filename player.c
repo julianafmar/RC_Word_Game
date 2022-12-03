@@ -12,7 +12,7 @@
 #define UNDERSCORE "_"
 #define WHITESPACE " "
 #define DEFAULT_GSIP "tejo.tecnico.ulisboa.pt"
-#define DEFAULT_GSport "58033"
+#define DEFAULT_GSport "58011"
 #define INPUT_SIZE 30
 #define PORT_SIZE 16
 #define IP_SIZE 64
@@ -123,6 +123,7 @@ void start(char plid[]){
     strcpy(send,  "SNG ");
     strcat(send, plid);
     strcpy(id, plid);
+    strcat(send, "\n");
     communication_upd(send);
 }
 
@@ -135,6 +136,7 @@ void play(char letter){
     strcat(send, &letter);
     sprintf(str, " %d", n_trials);
     strcat(send, str);
+    strcat(send, "\n");
     letter_try = letter;
     n_trials++; //n_trials so aumenta qnd a msg é realmente recebida, temos de mudar isso
     communication_upd(send);
@@ -149,19 +151,20 @@ void guess(char word[]){
     strcat(send, word);
     sprintf(str, " %d", n_trials);
     strcat(send, str);
+    strcat(send, "\n");
     n_trials++;
     communication_upd(send);
 }
 
 void communication_upd(char *send){
-    /*n = sendto(udp_fd, send, strlen(send), 0, udp_res->ai_addr, udp_res->ai_addrlen);
+    n = sendto(udp_fd, send, strlen(send), 0, udp_res->ai_addr, udp_res->ai_addrlen);
     if(n == -1) exit(1);
 
     addrlen = sizeof(addr);
     n = recvfrom(udp_fd, buffer, 128, 0, (struct sockaddr*) &addr, &addrlen);
     if(n == -1) exit(1);
 
-    received_udp(buffer);*/
+    received_udp(buffer);
 }
 
 void communication_tcp(char *send){
@@ -192,9 +195,9 @@ void received_udp(char *received){
             max_errors = atoi(token_list[3]);
             n_letters = atoi(token_list[2]);
             memset(word_spaces, *UNDERSCORE, n_letters);
-            printf("New game started. Guess %s letter word (max %s errors): %s", token_list[2], token_list[3], word_spaces);
+            printf("New game started. Guess %s letter word (max %s errors): %s\n", token_list[2], token_list[3], word_spaces);
         }
-        else printf("Something went wrong...");
+        else printf("Something went wrong...\n");
     }
     else if(strcmp(token_list[0], "RLG") == 0){
         if(strcmp(token_list[1], "OK") == 0){
@@ -208,19 +211,19 @@ void received_udp(char *received){
             printf("You won!");
         }
         if(strcmp(token_list[1], "DUP") == 0){
-            printf("You already tried this letter.");
+            printf("You already tried this letter.\n");
         }
         if(strcmp(token_list[1], "NOK") == 0){
             printf("nok"); //what is this?!?!
         }
         if(strcmp(token_list[1], "OVR") == 0){
-            printf("Game over.");
+            printf("Game over.\n");
         }
         if(strcmp(token_list[1], "INV") == 0){
             printf("inv"); //idk what to write here
         }
         if(strcmp(token_list[1], "ERR") == 0){
-            printf("err"); //idk what to write here either
+            printf("RLG ERR\n"); //idk what to write here either
         }
     }
     else if(strcmp(token_list[0], "RWG") == 0){
@@ -249,7 +252,7 @@ void received_udp(char *received){
         }
     }
     else if(strcmp(token_list[0], "RRV") == 0){}
-    else printf("Something went wrong...");
+    else printf("Something went wrong...\n");
         
     //função que trata dos prints visiveis para o player
 }
