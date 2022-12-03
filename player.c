@@ -30,6 +30,7 @@ int max_errors;
 int n_letters;
 char word_spaces[30];
 char letter_try;
+char GSport[PORT_SIZE], GSIP[IP_SIZE];
 
 void start(char plid[]);
 void play(char letter);
@@ -40,7 +41,6 @@ void received_udp(char *received);
 void received_tcp(char *received);
 
 int main(int argc, char *argv[]){
-    char GSport[PORT_SIZE], GSIP[IP_SIZE];
     strcpy(GSport, DEFAULT_GSport);
     strcpy(GSIP, DEFAULT_GSIP);
 
@@ -54,28 +54,6 @@ int main(int argc, char *argv[]){
     }
 
     char input[INPUT_SIZE];
-    
-    //udp
-    udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if(udp_fd == -1) exit(1);
-    memset(&udp_hints, 0, sizeof udp_hints);
-
-    udp_hints.ai_family = AF_INET;
-    udp_hints.ai_socktype = SOCK_DGRAM;
-
-    errcode = getaddrinfo(GSIP, GSport, &udp_hints, &udp_res);
-    if(errcode != 0) exit(1);
-    
-    //tcp
-    tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if(tcp_fd == -1) exit(1);
-    memset(&tcp_hints, 0, sizeof tcp_hints);
-
-    tcp_hints.ai_family = AF_INET;
-    tcp_hints.ai_socktype = SOCK_STREAM;
-
-    errcode = getaddrinfo(GSIP, GSport, &tcp_hints, &tcp_res);
-    if(errcode != 0) exit(1);
 
     for(;;){
         fgets(input, INPUT_SIZE, stdin);
@@ -107,7 +85,7 @@ int main(int argc, char *argv[]){
         else if(strcmp(token_list[0], "exit") == 0){
         }
         else{
-            printf("Something went wrong...");
+            printf("Something went wrong...\n");
         }
 
         memset(buffer, 0, strlen(buffer));
@@ -119,7 +97,7 @@ int main(int argc, char *argv[]){
 }
 
 void start(char plid[]){
-    char send[50];
+    char send[INPUT_SIZE];
     strcpy(send,  "SNG ");
     strcat(send, plid);
     strcpy(id, plid);
@@ -138,7 +116,6 @@ void play(char letter){
     strcat(send, str);
     strcat(send, "\n");
     letter_try = letter;
-    n_trials++; //n_trials so aumenta qnd a msg é realmente recebida, temos de mudar isso
     communication_upd(send);
 }
 
@@ -152,11 +129,20 @@ void guess(char word[]){
     sprintf(str, " %d", n_trials);
     strcat(send, str);
     strcat(send, "\n");
-    n_trials++;
     communication_upd(send);
 }
 
 void communication_upd(char *send){
+    printf("%s", send);
+    udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if(udp_fd == -1) exit(1);
+    memset(&udp_hints, 0, sizeof udp_hints);
+
+    udp_hints.ai_family = AF_INET;
+    udp_hints.ai_socktype = SOCK_DGRAM;
+
+    errcode = getaddrinfo(GSIP, GSport, &udp_hints, &udp_res);
+    if(errcode != 0) exit(1);
     n = sendto(udp_fd, send, strlen(send), 0, udp_res->ai_addr, udp_res->ai_addrlen);
     if(n == -1) exit(1);
 
@@ -164,11 +150,24 @@ void communication_upd(char *send){
     n = recvfrom(udp_fd, buffer, 128, 0, (struct sockaddr*) &addr, &addrlen);
     if(n == -1) exit(1);
 
+    freeaddrinfo(udp_res);
+    close(udp_fd);
+
     received_udp(buffer);
 }
 
 void communication_tcp(char *send){
-    /*n = connect(tcp_fd, tcp_res->ai_addr, tcp_res->ai_addrlen);
+    tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if(tcp_fd == -1) exit(1);
+    memset(&tcp_hints, 0, sizeof tcp_hints);
+
+    tcp_hints.ai_family = AF_INET;
+    tcp_hints.ai_socktype = SOCK_STREAM;
+
+    errcode = getaddrinfo(GSIP, GSport, &tcp_hints, &tcp_res);
+    if(errcode != 0) exit(1);
+    
+    n = connect(tcp_fd, tcp_res->ai_addr, tcp_res->ai_addrlen);
     if(n == -1) exit(1);
 
     n = write(tcp_fd, send, strlen(send));
@@ -177,7 +176,10 @@ void communication_tcp(char *send){
     n = read(tcp_fd, buffer, 128);
     if(n == -1) exit(1);
     
-    received_tcp(buffer);*/
+    received_tcp(buffer);
+    
+    freeaddrinfo(tcp_res);
+    close(tcp_fd);
 }
 
 void received_udp(char *received){
@@ -202,6 +204,7 @@ void received_udp(char *received){
     else if(strcmp(token_list[0], "RLG") == 0){
         if(strcmp(token_list[1], "OK") == 0){
             int n = atoi(token_list[3]);
+            n_trials++;
             for(int i = 0; i < n; i++){
                 word_spaces[atoi(token_list[4+i])] = letter_try; /*temos de ir buscar a letra para por aqui. char global??*/
             }
@@ -230,7 +233,8 @@ void received_udp(char *received){
         if(strcmp(token_list[1], "WIN") == 0){
             printf("You won!");
         }
-        if(strcmp(token_list[1], "NOK") == 0){
+        if(strcmp(token_list[1], "NOK") == 0){    
+            n_trials++;
             printf("nok"); //???
         }
         if(strcmp(token_list[1], "OVR") == 0){
