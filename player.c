@@ -35,6 +35,9 @@ char GSport[PORT_SIZE], GSIP[IP_SIZE];
 void start(char plid[]);
 void play(char letter);
 void guess(char word[]);
+void scoreboard();
+void hint();
+void state();
 void quit();
 void communication_udp(char *send);
 void communication_tcp(char *send);
@@ -76,10 +79,13 @@ int main(int argc, char *argv[]){
             guess(token_list[1]);
         }
         else if(strcmp(token_list[0], "scorebord") == 0 || strcmp(token_list[0], "sb") == 0){
+            scoreboard();
         }
         else if(strcmp(token_list[0], "hint") == 0 || strcmp(token_list[0], "h") == 0){
+            hint();
         }
         else if(strcmp(token_list[0], "state") == 0 || strcmp(token_list[0], "st") == 0){
+            state();
         }
         else if(strcmp(token_list[0], "quit") == 0){
             quit();
@@ -117,6 +123,24 @@ void guess(char word[]){
     char send[INPUT_SIZE];
     sprintf(send, "PWG %s %s %d\n", id, word, n_trials);
     communication_udp(send);
+}
+
+void scoreboard(){
+    char send[INPUT_SIZE];
+    sprintf(send, "GSB");
+    communication_tcp(send);
+}
+
+void hint(){
+    char send[INPUT_SIZE];
+    sprintf(send, "GHL %s\n", id);
+    communication_tcp(send);
+}
+
+void state(){
+    char send[INPUT_SIZE];
+    sprintf(send, "STA %s\n", id);
+    communication_tcp(send);
 }
 
 void quit(){
@@ -255,4 +279,39 @@ void received_udp(char *received){
     else printf("Something went wrong...\n");
 }
 
-void received_tcp(char *received){}
+void received_tcp(char *received){
+    char *token_list[35];
+    char *tok = strtok(received, " \n");
+    for (int i = 0; tok != NULL && i < 30; i++){
+        token_list[i] = tok;
+        tok = strtok(NULL, " \n");
+    }
+    if(strcmp(token_list[0], "RSB") == 0){
+        if(strcmp(token_list[1], "EMPTY") == 0){
+            printf("There is no scoreboard.\n");
+        }
+        if(strcmp(token_list[1], "OK") == 0){
+
+        }
+        else printf("Something went wrong...\n");
+
+    }
+    else if(strcmp(token_list[0], "RHL") == 0){
+        if(strcmp(token_list[1], "NOK") == 0){
+            printf("There was a problem.\n");
+        }
+        if(strcmp(token_list[1], "OK") == 0){
+
+        }
+        else printf("Something went wrong...\n");
+    }
+    else if(strcmp(token_list[0], "RST") == 0){
+        if(strcmp(token_list[1], "ACT") == 0){}
+        if(strcmp(token_list[1], "FIN") == 0){}
+        if(strcmp(token_list[1], "NOK") == 0){
+            printf("There is no game\n");
+        }
+        else printf("Something went wrong...\n");
+    }
+    else printf("Something went wrong...\n");
+}
