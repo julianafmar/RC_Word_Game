@@ -59,7 +59,7 @@ int main(int argc, char *argv[]){
 
     char input[INPUT_SIZE];
 
-    for(;;){
+    while(1){
         fgets(input, INPUT_SIZE, stdin);
 
 		char *token_list[5];
@@ -280,9 +280,9 @@ void received_udp(char *received){
 }
 
 void received_tcp(char *received){
-    char *token_list[35];
+    char *token_list[128];
     char *tok = strtok(received, " \n");
-    for (int i = 0; tok != NULL && i < 30; i++){
+    for (int i = 0; tok != NULL && i < 128; i++){
         token_list[i] = tok;
         tok = strtok(NULL, " \n");
     }
@@ -291,7 +291,12 @@ void received_tcp(char *received){
             printf("There is no scoreboard.\n");
         }
         if(strcmp(token_list[1], "OK") == 0){
-
+            FILE *fp = fopen(token_list[2], "w");
+            if(fp == NULL){
+                exit(1);
+            }
+            fwrite(token_list[4], 1, atoi(token_list[3]), fp);
+            fclose(fp);
         }
         else printf("Something went wrong...\n");
 
@@ -301,7 +306,12 @@ void received_tcp(char *received){
             printf("There was a problem.\n");
         }
         if(strcmp(token_list[1], "OK") == 0){
-
+            FILE *fp = fopen(token_list[2], "w");
+            if(fp == NULL){
+                exit(1);
+            }
+            fwrite(token_list[4], 1, atoi(token_list[3]), fp);
+            fclose(fp);
         }
         else printf("Something went wrong...\n");
     }
