@@ -286,6 +286,7 @@ void received_tcp(char *received){
         token_list[i] = tok;
         tok = strtok(NULL, " \n");
     }
+    
     if(strcmp(token_list[0], "RSB") == 0){
         if(strcmp(token_list[1], "EMPTY") == 0){
             printf("There is no scoreboard.\n");
@@ -306,12 +307,21 @@ void received_tcp(char *received){
             printf("There was a problem.\n");
         }
         if(strcmp(token_list[1], "OK") == 0){
-            FILE *fp = fopen(token_list[2], "w");
-            if(fp == NULL){
-                exit(1);
+            if(token_list[4] != NULL){
+                FILE *fp = fopen(token_list[2], "w");
+                if(fp == NULL) exit(1);
+                strcpy(buffer, token_list[4]);
+                size_t s = strlen(buffer);
+                fwrite(buffer, 1, s, fp);
+                n = read(tcp_fd, buffer, 128);
+                while(n > 0){
+                    fwrite(buffer, 1, n, fp);
+                    n = read(tcp_fd, buffer, 128);
+                    if(n == -1) exit(1);
+                }
+                fclose(fp);
             }
-            fwrite(token_list[4], 1, atoi(token_list[3]), fp);
-            fclose(fp);
+            
         }
         else printf("Something went wrong...\n");
     }
