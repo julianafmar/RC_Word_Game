@@ -24,7 +24,7 @@ ssize_t n;
 socklen_t addrlen;
 struct addrinfo udp_hints, tcp_hints, *udp_res, *tcp_res;
 struct sockaddr_in addr;
-char buffer[128];
+char buffer[129];
 int n_trials;
 int max_errors;
 int n_letters;
@@ -39,6 +39,7 @@ void scoreboard();
 void hint();
 void state();
 void quit();
+void rev(char plid[]);
 void communication_udp(char *send);
 void communication_tcp(char *send);
 void received_udp(char *received);
@@ -92,6 +93,10 @@ int main(int argc, char *argv[]){
         }
         else if(strcmp(token_list[0], "exit") == 0){
             quit();
+            break;
+        }
+        else if(strcmp(token_list[0], "rev") == 0){
+
         }
         else{
             printf("Something went wrong...\n");
@@ -99,7 +104,7 @@ int main(int argc, char *argv[]){
 
         memset(buffer, 0, strlen(buffer));
         memset(input, 0, strlen(input));
-        letter_try = *"\0";
+        letter_try = '\0';
     }
     return 0;
 }
@@ -149,6 +154,12 @@ void quit(){
     communication_udp(send);
 }
 
+void rev(char plid[]){
+    char send[INPUT_SIZE];
+    sprintf(send, "REV %s\n", plid);
+    communication_udp(send);
+}
+
 void communication_udp(char *send){
     udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if(udp_fd == -1) exit(1);
@@ -165,6 +176,7 @@ void communication_udp(char *send){
     addrlen = sizeof(addr);
     n = recvfrom(udp_fd, buffer, 128, 0, (struct sockaddr*) &addr, &addrlen);
     if(n == -1) exit(1);
+    buffer[129] = '\0';
 
     received_udp(buffer);
 
@@ -187,10 +199,21 @@ void communication_tcp(char *send){
     if(n == -1) exit(1);
 
     n = write(tcp_fd, send, strlen(send));
+    printf("Sent: %s, %ld", send, n);
     if(n == -1) exit(1);
 
     n = read(tcp_fd, buffer, 128);
     if(n == -1) exit(1);
+    buffer[129] = '\0';
+    printf("Received1: %s, %ld\n", buffer, n);
+    if(n < 128 && n != 0){
+        char *buf = buffer;
+        buf += n;
+        int m = n;
+        n = read(tcp_fd, buf, 128 - m);
+        if(n == -1) exit(1);
+        printf("Received: %s, %ld\n", buffer, n);
+    }
     
     received_tcp(buffer);
     
@@ -275,63 +298,74 @@ void received_udp(char *received){
             printf("RQT ERR\n");
         }
     }
-    else if(strcmp(token_list[0], "RRV") == 0){}
+    else if(strcmp(token_list[0], "RRV") == 0){
+        //later
+    }
     else printf("Something went wrong...\n");
 }
 
 void received_tcp(char *received){
-    char *token_list[128];
-    char *tok = strtok(received, " \n");
-    for (int i = 0; tok != NULL && i < 128; i++){
-        token_list[i] = tok;
-        tok = strtok(NULL, " \n");
-    }
-    
-    if(strcmp(token_list[0], "RSB") == 0){
-        if(strcmp(token_list[1], "EMPTY") == 0){
+    char command[3];
+    char status[6];
+    char Fname[24];
+    char Fsize[28];
+    printf("received %s\n", received);
+    sscanf(received, "%s", command);
+    printf("com x%sx\n", command);
+    if(strcmp(command, "RSB") == 0){
+        if(strcmp(status, "EMPTY") == 0){
             printf("There is no scoreboard.\n");
         }
-        if(strcmp(token_list[1], "OK") == 0){
-            FILE *fp = fopen(token_list[2], "w");
-            if(fp == NULL){
-                exit(1);
-            }
-            fwrite(token_list[4], 1, atoi(token_list[3]), fp);
-            fclose(fp);
-        }
-        else printf("Something went wrong...\n");
+        if(strcmp(status, "OK") == 0){}
 
     }
-    else if(strcmp(token_list[0], "RHL") == 0){
-        if(strcmp(token_list[1], "NOK") == 0){
+    else if(strcmp(command, "RHL") == 0){
+        received += 4;
+        sscanf(received, "%s", status);
+        printf("status x%sx\n", status);
+        if(strcmp(status, "NOK") == 0){
             printf("There was a problem.\n");
         }
-        if(strcmp(token_list[1], "OK") == 0){
-            if(token_list[4] != NULL){
-                FILE *fp = fopen(token_list[2], "w");
-                if(fp == NULL) exit(1);
-                strcpy(buffer, token_list[4]);
-                size_t s = strlen(buffer);
-                fwrite(buffer, 1, s, fp);
+        int r = 0;
+        if(strcmp(status, "OK") == 0){
+            received += strlen(status) + 1;
+            sscanf(received, "%s", Fname);
+            printf("fname x%sx\n", Fname);
+
+            received += strlen(Fname) + 1;
+            sscanf(received, "%s", Fsize);
+            printf("fsize x%sx\n", Fsize);
+
+            received += strlen(Fsize) + 1;
+
+            printf("dddd %ld %ld\n", strlen(Fname), strlen(Fsize));
+        
+            FILE *fp = fopen(Fname, "w");
+            if(fp == NULL) exit(1);
+            n -= (9 + strlen(Fname) + strlen(Fsize));
+            int size = atoi(Fsize);
+            size -= n;
+            fwrite(received, 1, n, fp);
+            while(n > 0 && size > 0){
+                printf("size %d, %ld\n", size, n);
                 n = read(tcp_fd, buffer, 128);
-                while(n > 0){
-                    fwrite(buffer, 1, n, fp);
-                    n = read(tcp_fd, buffer, 128);
-                    if(n == -1) exit(1);
-                }
-                fclose(fp);
+                buffer[129] = '\0';
+                fwrite(buffer, 1, n, fp);
+                if(n == -1) exit(1);
+                size -= n;
             }
+            fclose(fp);
             
         }
         else printf("Something went wrong...\n");
     }
-    else if(strcmp(token_list[0], "RST") == 0){
+    /*else if(strcmp(token_list[0], "RST") == 0){
         if(strcmp(token_list[1], "ACT") == 0){}
         if(strcmp(token_list[1], "FIN") == 0){}
         if(strcmp(token_list[1], "NOK") == 0){
             printf("There is no game\n");
         }
         else printf("Something went wrong...\n");
-    }
+    }*/
     else printf("Something went wrong...\n");
 }
