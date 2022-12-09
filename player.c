@@ -96,7 +96,7 @@ int main(int argc, char *argv[]){
             break;
         }
         else if(strcmp(token_list[0], "rev") == 0){
-
+            rev(id);
         }
         else{
             printf("Something went wrong...\n");
@@ -132,7 +132,7 @@ void guess(char word[]){
 
 void scoreboard(){
     char send[INPUT_SIZE];
-    sprintf(send, "GSB");
+    sprintf(send, "GSB\n");
     communication_tcp(send);
 }
 
@@ -313,11 +313,45 @@ void received_tcp(char *received){
     sscanf(received, "%s", command);
     printf("com x%sx\n", command);
     if(strcmp(command, "RSB") == 0){
+        received += 4;
+        sscanf(received, "%s", status);
         if(strcmp(status, "EMPTY") == 0){
             printf("There is no scoreboard.\n");
         }
-        if(strcmp(status, "OK") == 0){}
+        if(strcmp(status, "OK") == 0){
+            received += strlen(status) + 1;
+            sscanf(received, "%s", Fname);
 
+            received += strlen(Fname) + 1;
+            sscanf(received, "%s", Fsize);
+
+            received += strlen(Fsize) + 1;
+
+            FILE *fp = fopen(Fname, "w");
+            if(fp == NULL) exit(1);
+
+            n -= (9 + strlen(Fname) + strlen(Fsize));
+            int size = atoi(Fsize);
+            size -= n;
+            fwrite(received, 1, n, fp);
+            while(n > 0 && size > 0){
+                n = read(tcp_fd, buffer, 128);
+                buffer[129] = '\0';
+                fwrite(buffer, 1, n, fp);
+                if(n == -1) exit(1);
+                size -= n;
+            }
+            fclose(fp);
+
+            fp = fopen(Fname, "r");
+            if(fp == NULL) exit(1);
+            char c = fgetc(fp);
+            while(c != EOF){
+                printf("%c", c);
+                c = fgetc(fp);
+            }
+            fclose(fp);
+        }
     }
     else if(strcmp(command, "RHL") == 0){
         received += 4;
@@ -349,23 +383,98 @@ void received_tcp(char *received){
             while(n > 0 && size > 0){
                 printf("size %d, %ld\n", size, n);
                 n = read(tcp_fd, buffer, 128);
+                if(n == -1) exit(1);
                 buffer[129] = '\0';
                 fwrite(buffer, 1, n, fp);
                 if(n == -1) exit(1);
                 size -= n;
             }
             fclose(fp);
+            printf("The file name is %s and its size is %s.\n", Fname, Fsize);
             
+        }
+        if(strcmp(status, "NOK") == 0){
+            printf("There is no file to be send.\n");
         }
         else printf("Something went wrong...\n");
     }
-    /*else if(strcmp(token_list[0], "RST") == 0){
-        if(strcmp(token_list[1], "ACT") == 0){}
-        if(strcmp(token_list[1], "FIN") == 0){}
-        if(strcmp(token_list[1], "NOK") == 0){
-            printf("There is no game\n");
+    else if(strcmp(command, "RST") == 0){
+        received += 4;
+        sscanf(received, "%s", status);
+        if(strcmp(status, "ACT") == 0){
+            received += strlen(status) + 1;
+            sscanf(received, "%s", Fname);
+
+            received += strlen(Fname) + 1;
+            sscanf(received, "%s", Fsize);
+            received += strlen(Fsize) + 1;
+
+            FILE *fp = fopen(Fname, "w");
+            if(fp == NULL) exit(1);
+
+            n -= (9 + strlen(Fname) + strlen(Fsize));
+            int size = atoi(Fsize);
+            size -= n;
+            fwrite(received, 1, n, fp);
+            while(n > 0 && size > 0){
+                n = read(tcp_fd, buffer, 128);
+                buffer[129] = '\0';
+                fwrite(buffer, 1, n, fp);
+                if(n == -1) exit(1);
+                size -= n;
+            }
+            fclose(fp);
+
+            printf("The filename is %s and its size is %s. File's content is:\n", Fname, Fsize);
+
+            fp = fopen(Fname, "r");
+            if(fp == NULL) exit(1);
+            char c = fgetc(fp);
+            while(c != EOF){
+                printf("%c", c);
+                c = fgetc(fp);
+            }
+            fclose(fp);
+        }
+        else if(strcmp(status, "FIN") == 0){
+            received += strlen(status) + 1;
+            sscanf(received, "%s", Fname);
+
+            received += strlen(Fname) + 1;
+            sscanf(received, "%s", Fsize);
+            received += strlen(Fsize) + 1;
+
+            FILE *fp = fopen(Fname, "w");
+            if(fp == NULL) exit(1);
+
+            n -= (9 + strlen(Fname) + strlen(Fsize));
+            int size = atoi(Fsize);
+            size -= n;
+            fwrite(received, 1, n, fp);
+            while(n > 0 && size > 0){
+                n = read(tcp_fd, buffer, 128);
+                buffer[129] = '\0';
+                fwrite(buffer, 1, n, fp);
+                if(n == -1) exit(1);
+                size -= n;
+            }
+            fclose(fp);
+
+            printf("The filename is %s and its size is %s. File's content is:\n", Fname, Fsize);
+
+            fp = fopen(Fname, "r");
+            if(fp == NULL) exit(1);
+            char c = fgetc(fp);
+            while(c != EOF){
+                printf("%c", c);
+                c = fgetc(fp);
+            }
+            fclose(fp);
+        }
+        else if(strcmp(status, "NOK") == 0){
+            printf("There are no games.\n");
         }
         else printf("Something went wrong...\n");
-    }*/
+    }
     else printf("Something went wrong...\n");
 }
