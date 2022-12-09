@@ -71,6 +71,7 @@ int main(int argc, char *argv[]){
 		}
         
         if(strcmp(token_list[0], "start") == 0 || strcmp(token_list[0], "sg") == 0){
+            memset(word_spaces, 0 , 30);
             start(token_list[1]);
         } 
         else if(strcmp(token_list[0], "play") == 0 || strcmp(token_list[0], "pl") == 0){
@@ -97,9 +98,6 @@ int main(int argc, char *argv[]){
         }
         else if(strcmp(token_list[0], "rev") == 0){
             rev(id);
-        }
-        else{
-            printf("Something went wrong...\n");
         }
 
         memset(buffer, 0, strlen(buffer));
@@ -199,20 +197,19 @@ void communication_tcp(char *send){
     if(n == -1) exit(1);
 
     n = write(tcp_fd, send, strlen(send));
-    printf("Sent: %s, %ld", send, n);
     if(n == -1) exit(1);
 
     n = read(tcp_fd, buffer, 128);
     if(n == -1) exit(1);
     buffer[129] = '\0';
-    printf("Received1: %s, %ld\n", buffer, n);
     if(n < 128 && n != 0){
         char *buf = buffer;
         buf += n;
         int m = n;
         n = read(tcp_fd, buf, 128 - m);
         if(n == -1) exit(1);
-        printf("Received: %s, %ld\n", buffer, n);
+        buffer[129] = '\0';
+        n = 128;
     }
     
     received_tcp(buffer);
@@ -238,7 +235,6 @@ void received_udp(char *received){
             memset(word_spaces, *UNDERSCORE, n_letters);
             printf("New game started. Guess %s letter word (max %s errors): %s\n", token_list[2], token_list[3], word_spaces);
         }
-        else printf("Something went wrong...\n");
     }
     else if(strcmp(token_list[0], "RLG") == 0){
         if(strcmp(token_list[1], "OK") == 0){
@@ -269,7 +265,6 @@ void received_udp(char *received){
         else if(strcmp(token_list[1], "ERR") == 0){
             printf("RLG ERR\n");
         }
-        else printf("Something went wrong...\n");
     }
     else if(strcmp(token_list[0], "RWG") == 0){
         if(strcmp(token_list[1], "WIN") == 0){
@@ -288,7 +283,6 @@ void received_udp(char *received){
         else if(strcmp(token_list[1], "ERR") == 0){
             printf("RWG ERR\n");
         }
-        else printf("Something went wrong...\n");
     }
     else if(strcmp(token_list[0], "RQT") == 0){
         if(strcmp(token_list[1], "OK") == 0){
@@ -301,7 +295,6 @@ void received_udp(char *received){
     else if(strcmp(token_list[0], "RRV") == 0){
         //later
     }
-    else printf("Something went wrong...\n");
 }
 
 void received_tcp(char *received){
@@ -309,9 +302,8 @@ void received_tcp(char *received){
     char status[6];
     char Fname[24];
     char Fsize[28];
-    printf("received %s\n", received);
+    
     sscanf(received, "%s", command);
-    printf("com x%sx\n", command);
     if(strcmp(command, "RSB") == 0){
         received += 4;
         sscanf(received, "%s", status);
@@ -356,7 +348,6 @@ void received_tcp(char *received){
     else if(strcmp(command, "RHL") == 0){
         received += 4;
         sscanf(received, "%s", status);
-        printf("status x%sx\n", status);
         if(strcmp(status, "NOK") == 0){
             printf("There was a problem.\n");
         }
@@ -364,24 +355,19 @@ void received_tcp(char *received){
         if(strcmp(status, "OK") == 0){
             received += strlen(status) + 1;
             sscanf(received, "%s", Fname);
-            printf("fname x%sx\n", Fname);
 
             received += strlen(Fname) + 1;
             sscanf(received, "%s", Fsize);
-            printf("fsize x%sx\n", Fsize);
 
             received += strlen(Fsize) + 1;
-
-            printf("dddd %ld %ld\n", strlen(Fname), strlen(Fsize));
         
             FILE *fp = fopen(Fname, "w");
             if(fp == NULL) exit(1);
-            n -= (9 + strlen(Fname) + strlen(Fsize));
+            n = n - (9 + strlen(Fname) + strlen(Fsize));
             int size = atoi(Fsize);
             size -= n;
             fwrite(received, 1, n, fp);
             while(n > 0 && size > 0){
-                printf("size %d, %ld\n", size, n);
                 n = read(tcp_fd, buffer, 128);
                 if(n == -1) exit(1);
                 buffer[129] = '\0';
@@ -390,13 +376,11 @@ void received_tcp(char *received){
                 size -= n;
             }
             fclose(fp);
-            printf("The file name is %s and its size is %s.\n", Fname, Fsize);
-            
+            printf("The filename is %s and its size is %s.\n", Fname, Fsize);
         }
         if(strcmp(status, "NOK") == 0){
             printf("There is no file to be send.\n");
         }
-        else printf("Something went wrong...\n");
     }
     else if(strcmp(command, "RST") == 0){
         received += 4;
@@ -474,7 +458,5 @@ void received_tcp(char *received){
         else if(strcmp(status, "NOK") == 0){
             printf("There are no games.\n");
         }
-        else printf("Something went wrong...\n");
     }
-    else printf("Something went wrong...\n");
 }
