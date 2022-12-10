@@ -17,6 +17,8 @@
 #define PORT_SIZE 16
 #define IP_SIZE 64
 #define PLID_SIZE 7
+#define WORD_SIZE 31
+#define BUFFER_SIZE 129
 
 int tcp_fd, udp_fd, errcode;
 char id[PLID_SIZE];
@@ -24,11 +26,11 @@ ssize_t n;
 socklen_t addrlen;
 struct addrinfo udp_hints, tcp_hints, *udp_res, *tcp_res;
 struct sockaddr_in addr;
-char buffer[129];
+char buffer[BUFFER_SIZE];
 int n_trials;
 int max_errors;
 int n_letters;
-char word_spaces[30];
+char word_spaces[WORD_SIZE];
 char letter_try;
 char GSport[PORT_SIZE], GSIP[IP_SIZE];
 
@@ -61,6 +63,7 @@ int main(int argc, char *argv[]){
     char input[INPUT_SIZE];
 
     while(1){
+        printf("Insert command: ");
         fgets(input, INPUT_SIZE, stdin);
 
 		char *token_list[5];
@@ -98,6 +101,9 @@ int main(int argc, char *argv[]){
         }
         else if(strcmp(token_list[0], "rev") == 0){
             rev(id);
+        }
+        else{
+            printf("This command doesn't exist.\n");
         }
 
         memset(buffer, 0, strlen(buffer));
@@ -221,7 +227,7 @@ void communication_tcp(char *send){
 void received_udp(char *received){
     char *token_list[35];
     char *tok = strtok(received, " \n");
-    for (int i = 0; tok != NULL && i < 30; i++){
+    for (int i = 0; tok != NULL && i < INPUT_SIZE; i++){
         token_list[i] = tok;
         tok = strtok(NULL, " \n");
     }
