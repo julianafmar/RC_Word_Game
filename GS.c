@@ -16,7 +16,7 @@
 #define MAX_LINES 25
 
 int verbose = FALSE;
-int udp_fd, errcode;
+int udp_fd, tcp_fd, errcode;
 ssize_t n;
 socklen_t addrlen;
 struct addrinfo hints, *res;
@@ -47,9 +47,34 @@ int main(int argc, char *argv[]){
         }
     }
 
+    //UDP
+    udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if(udp_fd == -1) exit(1);
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_flags = AI_PASSIVE;
+    errcode = getaddrinfo(NULL, GSport, &hints, &res);
+    if(errcode != 0) exit(1);
+    n = bind(udp_fd, res->ai_addr, res->ai_addrlen);
+    if(n == -1) exit(1);
+
+    //TCP
+    tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if(tcp_fd == -1) exit(1);
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+    errcode = getaddrinfo(NULL, GSport, &hints, &res);
+    if((errcode) != 0) exit(1);
+    n = bind(tcp_fd, res->ai_addr, res->ai_addrlen);
+    if(n == -1) exit(1);
+    if(listen(tcp_fd, 5) == -1) exit(1);
+
     while(1){
-        
-        //fzr coisinhas do tcp e udp
+
+        //udp & tcp things here? fork? idk
 
         if(n != 0){
             char *ptr = buffer;

@@ -1,51 +1,4 @@
-#include <string.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <stdio.h>
-
-#define UNDERSCORE "_"
-#define WHITESPACE " "
-#define DEFAULT_GSIP "tejo.tecnico.ulisboa.pt"
-#define DEFAULT_GSport "58011"
-#define INPUT_SIZE 30
-#define PORT_SIZE 16
-#define IP_SIZE 64
-#define PLID_SIZE 7
-#define WORD_SIZE 31
-#define BUFFER_SIZE 129
-
-int tcp_fd, udp_fd, errcode;
-char id[PLID_SIZE];
-ssize_t n;
-socklen_t addrlen;
-struct addrinfo udp_hints, tcp_hints, *udp_res, *tcp_res;
-struct sockaddr_in addr;
-char buffer[BUFFER_SIZE];
-int n_trials;
-int max_errors;
-int n_letters;
-char word_spaces[WORD_SIZE];
-char letter_try;
-char GSport[PORT_SIZE], GSIP[IP_SIZE];
-
-void start(char plid[]);
-void play(char letter);
-void guess(char word[]);
-void scoreboard();
-void hint();
-void state();
-void quit();
-void rev(char plid[]);
-void communication_udp(char *send);
-void communication_tcp(char *send);
-void received_udp(char *received);
-void received_tcp(char *received);
+#include "player.h"
 
 int main(int argc, char *argv[]){
     strcpy(GSport, DEFAULT_GSport);
@@ -100,13 +53,12 @@ int main(int argc, char *argv[]){
             break;
         }
         else if(strcmp(token_list[0], "rev") == 0){
-            rev(id);
+            rev();
         }
         else{
             printf("This command doesn't exist.\n");
         }
 
-        memset(buffer, 0, strlen(buffer));
         memset(input, 0, strlen(input));
         letter_try = '\0';
     }
@@ -158,13 +110,14 @@ void quit(){
     communication_udp(send);
 }
 
-void rev(char plid[]){
+void rev(){
     char send[INPUT_SIZE];
-    sprintf(send, "REV %s\n", plid);
+    sprintf(send, "REV %s\n", id);
     communication_udp(send);
 }
 
 void communication_udp(char *send){
+    char buffer[BUFFER_SIZE];
     udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if(udp_fd == -1) exit(1);
     memset(&udp_hints, 0, sizeof(udp_hints));
@@ -189,6 +142,7 @@ void communication_udp(char *send){
 }
 
 void communication_tcp(char *send){
+    char buffer[BUFFER_SIZE];
     tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(tcp_fd == -1) exit(1);
     memset(&tcp_hints, 0, sizeof(tcp_hints));
@@ -304,6 +258,7 @@ void received_udp(char *received){
 }
 
 void received_tcp(char *received){
+    char buffer[BUFFER_SIZE];
     char command[3];
     char status[6];
     char Fname[24];
