@@ -38,6 +38,7 @@ void changeGameDir(char filename[], char plid[], char code);
 void scoreCreate();
 
 int main(int argc, char *argv[]){
+    pid_t pid;
     int n_trials = 0;
     int line_number = 0;
     char command[3];
@@ -83,8 +84,9 @@ int main(int argc, char *argv[]){
     if(listen(tcp_fd, 5) == -1) exit(1);
 
     while(1){
-
-        //udp & tcp things here? fork? idk
+        addrlen = sizeof(addr);
+        n = recvfrom(udp_fd, buffer, 128, 0, (struct sockaddr*) &addr, &addrlen);
+        if(n == -1) exit(1);
 
         char *ptr = buffer;
         sscanf(ptr, "%s", command);
@@ -105,6 +107,11 @@ int main(int argc, char *argv[]){
     }
 }
 
+void udpSendToClient(char buffer[]){
+    n = sendto(udp_fd, buffer, n, 0, (struct sockaddr*) &addr, addrlen);
+    if(n == -1) exit(1);
+}
+
 void start(char plid[], int line_number, char word_file[]){
     char game_file[FILE_SIZE];
     char word[30];
@@ -114,7 +121,7 @@ void start(char plid[], int line_number, char word_file[]){
     sprintf(game_file, "GAME/GAME_%s.txt", plid);
     if(access(game_file, F_OK) != 0){
         strcpy(send, "RSG NOK\n");
-        //return NOK to client;
+        udpSendToClient(send);
         //maybe access is not enough, i think we need to see if we have plays inside the file
     }
     else{
@@ -139,7 +146,7 @@ void start(char plid[], int line_number, char word_file[]){
         fclose(fp_game);
 
         sprintf(send, "RSG OK %d %d\n", word_len, max_errors);
-        //send to player
+        udpSendToClient(send);
     }
 }
 
@@ -155,7 +162,7 @@ void play(char plid[], char letter, int trial){
     sprintf(game_file, "GAME_%s.txt", plid);
     
     if(access(game_file, F_OK) != 0){
-        //send ERR
+        udpSendToClient("RLG ERR\n");
     }
     
     FILE *fp = fopen(game_file, "rw");
@@ -170,9 +177,9 @@ void play(char plid[], char letter, int trial){
         if(strlen(play_wl) == 1){
             char *let = play_wl;
             if(letter == *let){
-                sprintf(send, "RLG DUP %d\n", trial);
+                sprintf(send, "RLG DUP %d\n", trial); //é suposto ter sempre o trial a seguir?
                 if(trial != i){
-                    //send DUP
+                    udpSendToClient(send);
                 }
                 else{
                     //has to send again -> create function
@@ -186,7 +193,7 @@ void play(char plid[], char letter, int trial){
         }
     }
     if(i != trial){
-        //send INV
+        udpSendToClient("RLG INV\n");
     }
     else if(strchr(word, letter) != NULL){
         int new_pos = 0;
@@ -202,19 +209,17 @@ void play(char plid[], char letter, int trial){
         }
         strcat(positions, "\n");
         if((right_trials + new_pos) == strlen(word)){
-            //send WIN
-
             char write[WORD_SIZE];
             sprintf(write, "T %c\n", letter);
             fileWrite(game_file, write, "a");
             changeGameDir(game_file, plid, 'W');
+            udpSendToClient("RLG WIN\n");
         }
         else{
-            //send OK
-
             char write[WORD_SIZE];
             sprintf(write, "T %c\n", letter);
             fileWrite(game_file, write, "a");
+            udpSendToClient("RLG OK\n");
         }
     }
     else if(getMaxErrors(strlen(word)) == wrong_trials++){
@@ -222,13 +227,13 @@ void play(char plid[], char letter, int trial){
         sprintf(write, "T %c\n", letter);
         fileWrite(game_file, write, "a");
         changeGameDir(game_file, plid, 'F');
-        //send OVR
+        udpSendToClient("RLG OVR\n");
     }
     else if(getMaxErrors(strlen(word)) > wrong_trials++){
         char write[WORD_SIZE];
         sprintf(write, "T %c\n", letter);
         fileWrite(game_file, write, "a");
-        //send NOK
+        udpSendToClient("RLG NOK\n");
     }
 
     fclose(fp);
