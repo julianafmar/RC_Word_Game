@@ -29,8 +29,8 @@ socklen_t addrlen;
 struct addrinfo hints, *res;
 struct sockaddr_in addr;
 
-void start(char plid[], int line_number, char word_file[]);
-void play(char plid[], char letter, int trial);
+int start(char plid[], int line_number, char word_file[]);
+int play(char plid[], char letter, int trial);
 void scoreboard();
 int getMaxErrors(int word_len);
 void fileWrite(char file_name[], char write[], char type[]);
@@ -43,7 +43,6 @@ int main(int argc, char *argv[]){
     int line_number = 0;
     char command[3];
     char plid[6];
-    char buffer[128];
     char word_file[FILE_SIZE];
     char GSport[PORT_SIZE];
     strcpy(GSport, DEFAULT_GSport);
@@ -84,24 +83,35 @@ int main(int argc, char *argv[]){
     if(listen(tcp_fd, 5) == -1) exit(1);
 
     while(1){
-        addrlen = sizeof(addr);
-        n = recvfrom(udp_fd, buffer, 128, 0, (struct sockaddr*) &addr, &addrlen);
-        if(n == -1) exit(1);
+        char buffer[128];
+        if((pid = fork()) == 0){
+            addrlen = sizeof(addr);
+            int newfd = accept(tcp_fd, (struct sockaddr*) &addr, &addrlen);
+            if(newfd == -1) exit(1);
+            n = read(newfd, buffer, 128);
+            if(n == -1) exit(1);
+        }
+        else{
+            addrlen = sizeof(addr);
+            n = recvfrom(udp_fd, buffer, 128, 0, (struct sockaddr*) &addr, &addrlen);
+            if(n == -1) exit(1);
+        }
 
         char *ptr = buffer;
         sscanf(ptr, "%s", command);
         ptr += strlen(command);
+
         if(strcmp(command, "SNG") == 0){
             sscanf(ptr, "%s", plid);
             start(plid, line_number, word_file);
         }
-        if(strcmp(command, "PLG") == 0){
+        else if(strcmp(command, "PLG") == 0){
             char letter, c_trial[2];
             sscanf(ptr, "%s %c %s", plid, &letter, c_trial);
             int trial = atoi(c_trial);
             play(plid, letter, trial);
         }
-        if(strcmp(command, "GSB") == 0){
+        else if(strcmp(command, "GSB") == 0){
             scoreboard();
         }
     }
@@ -112,23 +122,47 @@ void udpSendToClient(char buffer[]){
     if(n == -1) exit(1);
 }
 
-void start(char plid[], int line_number, char word_file[]){
+void tcpSendToClient(char buffer[]){
+    n = write(tcp_fd, buffer, n);
+    if(n == -1) exit(1);
+}
+
+int start(char plid[], int line_number, char word_file[]){
     char game_file[FILE_SIZE];
+    int word_len;
     char word[30];
     char send[80];
+    char line[50];
     int max_errors;
 
     sprintf(game_file, "GAME/GAME_%s.txt", plid);
-    if(access(game_file, F_OK) != 0){
-        strcpy(send, "RSG NOK\n");
-        udpSendToClient(send);
-        //maybe access is not enough, i think we need to see if we have plays inside the file
+    if(access(game_file, F_OK) == 0){
+        FILE *fp = fopen(game_file, "r");
+        if(fp == NULL) exit(1);
+
+        int i = 0;
+        for(; fgets(line, sizeof(line), fp) != NULL && i <= MAX_LINES; i++){
+            if(i == 0){
+                sscanf(line, "%s", word);
+            }
+        }
+        if(i == 0){
+            word_len = strlen(word);
+            max_errors = getMaxErrors(word_len);
+            sprintf(send, "RSG OK %d %d\n", word_len, max_errors);
+            udpSendToClient(send);
+        }
+        else{
+            strcpy(send, "RSG NOK\n");
+            udpSendToClient(send);
+        }
+        fclose(fp);
+        return 0;
     }
     else{
         FILE *fp = fopen(word_file, "r");
         if(fp == NULL) exit(1);
-
-        char line[50];
+        
         for(int i = 0; fgets(line, sizeof(line), fp) != NULL && i <= MAX_LINES; i++){
             if((i % MAX_LINES) == line_number){
                 sscanf(line, "%s", word);
@@ -138,7 +172,7 @@ void start(char plid[], int line_number, char word_file[]){
         line_number++;
         fclose(fp);
 
-        int word_len = strlen(word);
+        word_len = strlen(word);
         max_errors = getMaxErrors(word_len);
 
         FILE *fp_game = fopen(game_file, "w");
@@ -147,10 +181,11 @@ void start(char plid[], int line_number, char word_file[]){
 
         sprintf(send, "RSG OK %d %d\n", word_len, max_errors);
         udpSendToClient(send);
+        return 0;
     }
 }
 
-void play(char plid[], char letter, int trial){
+int play(char plid[], char letter, int trial){
     char game_file[FILE_SIZE];
     char send[80];
     char code[2];
@@ -163,6 +198,7 @@ void play(char plid[], char letter, int trial){
     
     if(access(game_file, F_OK) != 0){
         udpSendToClient("RLG ERR\n");
+        return 0;
     }
     
     FILE *fp = fopen(game_file, "rw");
@@ -180,9 +216,8 @@ void play(char plid[], char letter, int trial){
                 sprintf(send, "RLG DUP %d\n", trial); //é suposto ter sempre o trial a seguir?
                 if(trial != i){
                     udpSendToClient(send);
-                }
-                else{
-                    //has to send again -> create function
+                    fclose(fp);
+                    return 0;
                 }
             }
         }
@@ -194,6 +229,8 @@ void play(char plid[], char letter, int trial){
     }
     if(i != trial){
         udpSendToClient("RLG INV\n");
+        fclose(fp);
+        return 0;
     }
     else if(strchr(word, letter) != NULL){
         int new_pos = 0;
@@ -214,12 +251,16 @@ void play(char plid[], char letter, int trial){
             fileWrite(game_file, write, "a");
             changeGameDir(game_file, plid, 'W');
             udpSendToClient("RLG WIN\n");
+            fclose(fp);
+            return 0;
         }
         else{
             char write[WORD_SIZE];
             sprintf(write, "T %c\n", letter);
             fileWrite(game_file, write, "a");
             udpSendToClient("RLG OK\n");
+            fclose(fp);
+            return 0;
         }
     }
     else if(getMaxErrors(strlen(word)) == wrong_trials++){
@@ -228,15 +269,20 @@ void play(char plid[], char letter, int trial){
         fileWrite(game_file, write, "a");
         changeGameDir(game_file, plid, 'F');
         udpSendToClient("RLG OVR\n");
+        fclose(fp);
+        return 0;
     }
     else if(getMaxErrors(strlen(word)) > wrong_trials++){
         char write[WORD_SIZE];
         sprintf(write, "T %c\n", letter);
         fileWrite(game_file, write, "a");
         udpSendToClient("RLG NOK\n");
+        fclose(fp);
+        return 0;
     }
 
     fclose(fp);
+    return 0;
 }
 
 void scoreboard(){
