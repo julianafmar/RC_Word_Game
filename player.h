@@ -14,8 +14,7 @@
 
 #define UNDERSCORE "_"
 #define WHITESPACE " "
-#define DEFAULT_GSIP "tejo.tecnico.ulisboa.pt"
-#define DEFAULT_GSport "58011"
+#define DEFAULT_GSport "58033"
 #define INPUT_SIZE 30
 #define PORT_SIZE 16
 #define IP_SIZE 64

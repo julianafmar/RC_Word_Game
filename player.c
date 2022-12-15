@@ -2,7 +2,18 @@
 
 int main(int argc, char *argv[]){
     strcpy(GSport, DEFAULT_GSport);
-    strcpy(GSIP, DEFAULT_GSIP);
+
+    char hostbuffer[256];
+    char *IPbuffer;
+    struct hostent *host_entry;
+    int hostname;
+    hostname = gethostname(hostbuffer, sizeof(hostbuffer));
+    if(hostname == -1) perror("gethostname");
+    host_entry = gethostbyname(hostbuffer);
+    if(host_entry == NULL) perror("gethostbyname");
+    IPbuffer = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
+    if(IPbuffer == NULL) perror("inet_ntoa");
+    strcpy(GSIP, IPbuffer);
 
     for(int i = 0; i < argc - 1; i++){
         if(strcmp(argv[i], "-p") == 0){
@@ -25,7 +36,6 @@ int main(int argc, char *argv[]){
 			token_list[i] = tok;
 			tok = strtok(NULL, " \n");
 		}
-        
         if(strcmp(token_list[0], "start") == 0 || strcmp(token_list[0], "sg") == 0){
             memset(word_spaces, 0 , 30);
             start(token_list[1]);
@@ -67,7 +77,7 @@ int main(int argc, char *argv[]){
 
 void start(char plid[]){
     char send[INPUT_SIZE];
-    n_trials = 1;
+    n_trials = 1; //qnd ja existe jogo isto fica errado :/
     strcpy(id, plid);
     sprintf(send, "SNG %s\n", plid);
     communication_udp(send);
@@ -75,7 +85,7 @@ void start(char plid[]){
 
 void play(char letter){
     char send[INPUT_SIZE];
-    sprintf(send, "PLG %s %s %d\n", id, &letter, n_trials);
+    sprintf(send, "PLG %s %c %d\n", id, letter, n_trials);
     letter_try = letter;
     communication_udp(send);
 }
@@ -134,6 +144,7 @@ void communication_udp(char *send){
     n = recvfrom(udp_fd, buffer, 128, 0, (struct sockaddr*) &addr, &addrlen);
     if(n == -1) exit(1);
     buffer[129] = '\0';
+    printf("n %ld buf %sx\n", n, buffer);
 
     received_udp(buffer);
 
@@ -253,7 +264,7 @@ void received_udp(char *received){
         }
     }
     else if(strcmp(token_list[0], "RRV") == 0){
-        //later
+        printf("%s", token_list[1]);
     }
 }
 

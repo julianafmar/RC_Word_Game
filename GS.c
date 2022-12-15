@@ -16,7 +16,7 @@
 
 #define TRUE 1
 #define FALSE 0
-#define DEFAULT_GSport "58033" 
+#define DEFAULT_GSport "58033"
 #define PORT_SIZE 16
 #define MAX_LINES 25
 #define FILE_SIZE 30
@@ -26,11 +26,11 @@ int verbose = FALSE;
 int udp_fd, tcp_fd, errcode;
 ssize_t n;
 socklen_t addrlen;
-struct addrinfo hints, *res;
+struct addrinfo udp_hints, tcp_hints, *udp_res, *tcp_res;
 struct sockaddr_in addr;
 char buffer[128];
 
-int start(char plid[], int line_number, char word_file[]);
+int start(char plid[], char word_file[]);
 int play(char plid[], char letter, int trial);
 void guess(char plid[], char guess_word[], int trial);
 void quit(char plid[]);
@@ -43,7 +43,6 @@ void scoreCreate(int n_succ, int n_wrong, char plid[], char filename[], char wor
 int main(int argc, char *argv[]){
     pid_t pid;
     int n_trials = 0;
-    int line_number = 0;
     char command[3];
     char plid[6];
     char word_file[FILE_SIZE];
@@ -63,25 +62,25 @@ int main(int argc, char *argv[]){
     //UDP
     udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if(udp_fd == -1) exit(1);
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_flags = AI_PASSIVE;
-    errcode = getaddrinfo(NULL, GSport, &hints, &res);
+    memset(&udp_hints, 0, sizeof(udp_hints));
+    udp_hints.ai_family = AF_INET;
+    udp_hints.ai_socktype = SOCK_DGRAM;
+    udp_hints.ai_flags = AI_PASSIVE;
+    errcode = getaddrinfo(NULL, GSport, &udp_hints, &udp_res);
     if(errcode != 0) exit(1);
-    n = bind(udp_fd, res->ai_addr, res->ai_addrlen);
+    n = bind(udp_fd, udp_res->ai_addr, udp_res->ai_addrlen);
     if(n == -1) exit(1);
 
     //TCP
     tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(tcp_fd == -1) exit(1);
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE;
-    errcode = getaddrinfo(NULL, GSport, &hints, &res);
+    memset(&tcp_hints, 0, sizeof(tcp_hints));
+    tcp_hints.ai_family = AF_INET;
+    tcp_hints.ai_socktype = SOCK_STREAM;
+    tcp_hints.ai_flags = AI_PASSIVE;
+    errcode = getaddrinfo(NULL, GSport, &tcp_hints, &tcp_res);
     if((errcode) != 0) exit(1);
-    n = bind(tcp_fd, res->ai_addr, res->ai_addrlen);
+    n = bind(tcp_fd, tcp_res->ai_addr, tcp_res->ai_addrlen);
     if(n == -1) exit(1);
     if(listen(tcp_fd, 5) == -1) exit(1);
 
@@ -98,7 +97,7 @@ int main(int argc, char *argv[]){
 
             if(strcmp(command, "SNG") == 0){
                 sscanf(ptr, "%s", plid);
-                start(plid, line_number, word_file);
+                start(plid, word_file);
             }
 
             if(strcmp(command, "PLG") == 0){
@@ -122,7 +121,7 @@ int main(int argc, char *argv[]){
         }
     }
 
-    else if (pid > 0){
+    if (pid > 0){
         //TCP
         while(1){
             addrlen = sizeof(addr);
@@ -144,14 +143,16 @@ int main(int argc, char *argv[]){
 void udpSendToClient(char buffer[]){
     n = sendto(udp_fd, buffer, n, 0, (struct sockaddr*) &addr, addrlen);
     if(n == -1) exit(1);
+    printf("UDP: %s, %ld", buffer, n);
 }
 
-/*void tcpSendToClient(char buffer[]){
+void tcpSendToClient(char buffer[]){
     n = write(tcp_fd, buffer, n);
     if(n == -1) exit(1);
-}*/
+}
 
-int start(char plid[], int line_number, char word_file[]){
+int start(char plid[], char word_file[]){
+    //add err
     char game_file[FILE_SIZE];
     int word_len;
     char word[30];
@@ -170,7 +171,8 @@ int start(char plid[], int line_number, char word_file[]){
                 sscanf(line, "%s", word);
             }
         }
-        if(i == 0){
+        printf("%d", i);
+        if(i == 1){
             word_len = strlen(word);
             max_errors = getMaxErrors(word_len);
             sprintf(send, "RSG OK %d %d\n", word_len, max_errors);
@@ -186,14 +188,17 @@ int start(char plid[], int line_number, char word_file[]){
     else{
         FILE *fp = fopen(word_file, "r");
         if(fp == NULL) exit(1);
-        
+
+        time_t t;
+        srand((unsigned) time(&t));
+
+        int line_number = rand() % MAX_LINES;        
         for(int i = 0; fgets(line, sizeof(line), fp) != NULL && i <= MAX_LINES; i++){
-            if((i % MAX_LINES) == line_number){
+            if(i == line_number){
                 sscanf(line, "%s", word);
                 break;
             }
         }
-        line_number++;
         fclose(fp);
 
         word_len = strlen(word);
@@ -204,6 +209,7 @@ int start(char plid[], int line_number, char word_file[]){
         fclose(fp_game);
 
         sprintf(send, "RSG OK %d %d\n", word_len, max_errors);
+        n = strlen(send);
         udpSendToClient(send);
         return 0;
     }
@@ -239,6 +245,7 @@ int play(char plid[], char letter, int trial){
             if(letter == *let){
                 sprintf(send, "RLG DUP %d\n", trial); //é suposto ter sempre o trial a seguir?
                 if(trial != i){
+                    n = strlen(send);
                     udpSendToClient(send);
                     fclose(fp);
                     return 0;
@@ -247,8 +254,18 @@ int play(char plid[], char letter, int trial){
         }
         
         if(strcmp("T", code) == 0){
-            if(strstr(word, play_wl) != NULL) right_trials++;
-            else wrong_trials++;
+            if(strstr(word, play_wl) != NULL){
+                for(int j = 0; j < strlen(word); j++){
+                    char *let = play_wl;
+                    if(word[j] == *let){
+                        right_trials++;
+                    }
+                }
+            }
+            else{
+                wrong_trials++;
+            }
+                
         }
     }
     if(i != trial){
@@ -256,24 +273,29 @@ int play(char plid[], char letter, int trial){
         fclose(fp);
         return 0;
     }
-    else if(strchr(word, letter) != NULL){
+    printf("a\n");
+    if(strchr(word, letter) != NULL){
         int new_pos = 0;
-        char positions[30];
-        sprintf(positions, "%c", letter);
+        char positions[50] = "";
         for(int i = 0; i < strlen(word); i++){
             if(word[i] == letter){
                 char aux[3];
-                sprintf(aux, " %d", (i+1));
+                int x = i + 1;
+                sprintf(aux, "%d ", x);
                 strcat(positions, aux);
                 new_pos++;
             }
         }
-        strcat(positions, "\n");
-        if((right_trials + new_pos) == strlen(word)){
+        positions[strlen(positions)-1] = '\0';
+
+        int tr = right_trials + new_pos;
+        printf("x%sx, %d, %ld, %d, %d\n", positions, tr, strlen(word), wrong_trials, right_trials);
+        if(tr == strlen(word)){
+            printf("b");
             char write[WORD_SIZE];
             sprintf(write, "T %c\n", letter);
             fileWrite(game_file, write, "a");
-            scoreCreate(right_trials+new_pos, wrong_trials, plid, game_file, word);
+            scoreCreate(tr, wrong_trials, plid, game_file, word);
             changeGameDir(game_file, plid, 'W');
             udpSendToClient("RLG WIN\n");
             fclose(fp);
@@ -283,12 +305,15 @@ int play(char plid[], char letter, int trial){
             char write[WORD_SIZE];
             sprintf(write, "T %c\n", letter);
             fileWrite(game_file, write, "a");
-            udpSendToClient("RLG OK\n");
+            sprintf(send, "RLG OK %d %d %s\n", right_trials+wrong_trials, new_pos, positions);
+            printf("send %s\n", send);
+            n = strlen(send);
+            udpSendToClient(send);
             fclose(fp);
             return 0;
         }
     }
-    else if(getMaxErrors(strlen(word)) == wrong_trials++){
+    else if(getMaxErrors(strlen(word)) <= (wrong_trials+1)){
         char write[WORD_SIZE];
         sprintf(write, "T %c\n", letter);
         fileWrite(game_file, write, "a");
@@ -311,8 +336,40 @@ int play(char plid[], char letter, int trial){
 }
 
 void scoreboard(int pid){
-    char filename[20];
-    
+    char send[129];
+
+    sprintf(send, "\n-------------------------------- TOP 10 SCORES --------------------------------\n\n");
+    n = 83;
+    tcpSendToClient(send);
+
+    sprintf(send, "    SCORE PLAYER     WORD                             GOOD TRIALS  TOTAL TRIALS\n\n");
+    n = 82;
+    tcpSendToClient(send);
+
+    struct dirent **player_score;
+    int m =  scandir("SCORES/", &player_score, NULL, alphasort);
+    if(m < 0) perror("scandir");
+    if(m > 10) m = 10;
+
+    for(int i = 1; i <= 10; i++){
+        char pl_line[85], word[31], spaces_1[40], spaces_2[15];
+        int score, plid, n_succ, n_trials;
+
+        FILE *fp = fopen(player_score[i-1]->d_name, "r");
+        fgets(pl_line, sizeof(pl_line), fp);
+        sscanf(pl_line, "%d %d %s %d %d", &score, &plid, word, &n_succ, &n_trials);
+        fclose(fp);
+
+        char new_line[100];
+        memset(spaces_1, ' ', (40 - strlen(word)));
+        memset(spaces_2, ' ', 13);
+        sprintf(new_line, " %d - %d  %d  %s%s%d%s%d\n", i, score, plid, word, spaces_1, n_succ, spaces_2, n_trials);
+        n = strlen(new_line);
+        tcpSendToClient(new_line);
+    }
+
+    /*char filename[20];
+
     sprintf(filename, "TOPSCORES_%d.txt", pid);
     FILE *score_file = fopen(filename, "w");
     if(score_file == NULL) exit(1);
@@ -321,9 +378,10 @@ void scoreboard(int pid){
     fwrite("    SCORE PLAYER     WORD                             GOOD TRIALS  TOTAL TRIALS\n\n", 1, 81, score_file);
 
     struct dirent **player_score;
-    int n =  scandir("SCORES/", &player_score, NULL, alphasort);
-    if(n < 0) perror("scandir");
+    int m =  scandir("SCORES/", &player_score, NULL, alphasort);
+    if(m < 0) perror("scandir");
 
+    if(m > 10) m = 10;
     for(int i = 1; i <= 10; i++){
         char pl_line[85], word[31], spaces_1[45], spaces_2[45];
         int score, plid, n_succ, n_trials;
@@ -338,9 +396,9 @@ void scoreboard(int pid){
         memset(spaces_2, ' ', 13);
         sprintf(new_line, " %d - %d  %d  %s%s%d%s%d\n", i, score, plid, word, spaces_1, n_succ, spaces_2, n_trials);
     }
-    fclose(score_file);
+    fclose(score_file);*/
 
-    //send tcp
+    //tcpSendToClient();
 }
 
 void guess(char plid[], char guess_word[], int trial){
@@ -370,24 +428,22 @@ void guess(char plid[], char guess_word[], int trial){
     }
     if(strcmp(word, guess_word) == 0){
         sprintf(send, "RWG WIN %d\n", trial);
-        changeGameDir(game_file, plid, *"W");
+        changeGameDir(game_file, plid, 'W');
+        //falta um scoreCreate();
     }
     else{
         if((trial - getMaxErrors(strlen(word))) <= 0){
             sprintf(send, "RWG OVR %d\n", trial);
-            changeGameDir(game_file, plid, *"F");
-            //Não sei qual é o código quando se perde
+            changeGameDir(game_file, plid, 'F');
         }
         else{
             sprintf(send, "RWG NOK %d\n", trial);
-            //Confirmar esta parte com a Juliana
             char write[WORD_SIZE];
-            sprintf(write, "T %s\n", guess_word);
+            sprintf(write, "G %s\n", guess_word);
             fileWrite(game_file, write, "a");
         }
     }
     udpSendToClient(send);
-
     fclose(fp);
 }
 
@@ -403,7 +459,7 @@ void quit(char plid[]){
         udpSendToClient("RQT ERR\n");
     }
     else{
-        freeaddrinfo(res);
+        freeaddrinfo(tcp_res);
         close(tcp_fd);
         udpSendToClient("RQT OK\n");
     }
@@ -443,13 +499,14 @@ void changeGameDir(char filename[], char plid[], char code){
     stat(filename, &attr);
     t = gmtime(&attr.st_mtime);
 
-    sprintf(new_filename, "GAMES/%s/%d%d%d_%d%d%d_%c", plid, t->tm_year, t->tm_mon, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, code);
+    sprintf(new_filename, "GAMES/%s/%d%d%d_%d%d%d_%c.txt", plid, t->tm_year, t->tm_mon, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, code);
     int m = rename(filename, new_filename);
 }
 
 void scoreCreate(int n_succ, int n_wrong, char plid[], char filename[], char word[]){
-    int score = n_succ / (n_succ + n_wrong) * 100;
-
+    int total_trials = n_succ + n_wrong;
+    int score = (n_succ * 100) / total_trials;
+    
     struct stat attr;
     struct tm *t;
     stat(filename, &attr);
@@ -457,8 +514,13 @@ void scoreCreate(int n_succ, int n_wrong, char plid[], char filename[], char wor
 
     char scorefile[30];
     sprintf(scorefile, "SCORES/%d_%s_%d%d%d_%d%d%d.txt", score, plid, t->tm_year, t->tm_mon, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
+
+    FILE *fp = fopen(scorefile, "w");
+    if(fp == NULL) exit(1);
     
     char write[30];
-    sprintf(write, "%d %s %s %d %d", score, plid, word, n_succ, (n_succ + n_wrong));
-    fileWrite(scorefile, write, "w");
+    sprintf(write, "%d %s %s %d %d", score, plid, word, n_succ, total_trials);
+
+    fwrite(write, 1, strlen(write), fp);
+    fclose(fp);
 }
