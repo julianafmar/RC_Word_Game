@@ -139,7 +139,6 @@ int main(int argc, char *argv[]){
             ptr += strlen(command);
 
             if(strcmp(command, "GSB") == 0){
-                printf("kkkkk %d", pid);
                 scoreboard(pid);
             }
             /*if(verbose){
@@ -161,7 +160,7 @@ void tcpSendToClient(char buffer[]){
         n = write(newfd, buffer, c);
         if(n == -1) exit(1);
         c -= n;
-        printf("TCP: %s, %ld", buffer, n);
+        printf("TCP: %s, %ld\n", buffer, n);
     }
 }
 
@@ -348,13 +347,14 @@ int play(char plid[], char letter, int trial){
 
 int scoreboard(int pid){
     char send[129];
-    printf("scoreboard");
 
     struct dirent **player_score;
     int m =  scandir("SCORES/", &player_score, NULL, alphasort);
     if(m < 0) perror("scandir");
-    if(m > 10) m = 10;
+    printf("%s | %s | %s | %s\n", player_score[0]->d_name, player_score[1]->d_name, player_score[2]->d_name, player_score[3]->d_name);
     printf("mm %d\n", m);
+    if(m > 10) m = 10;
+    
     if(m == 0){
         sprintf(send, "RSB EMPTY\n");
         n = strlen(send);
@@ -363,7 +363,7 @@ int scoreboard(int pid){
         return 0;
     }
 
-    int total = 83 + 82 + m * 76;
+    int total = 83 + 82 + (m-2) * 75;
 
     sprintf(send, "RSB OK TOPSCORES_%d.txt %d\n", pid, total);
     n = strlen(send);
@@ -377,24 +377,26 @@ int scoreboard(int pid){
     n = strlen(send);
     tcpSendToClient(send);
 
-    for(int i = 1; i <= m; i++){
-        char pl_line[85], word[31], spaces_1[40], spaces_2[15];
+    for(int i = 2; i < m; i++){
+        char pl_line[85], word[31], spaces_1[40], spaces_2[15], aux[263];
         int score, plid, n_succ, n_trials;
 
-        FILE *fp = fopen(player_score[i-1]->d_name, "r");
-        if(fp == NULL) printf("error\n");
+        sprintf(aux, "SCORES/%s", player_score[i]->d_name);
+        FILE *fp = fopen(aux, "r");
+        if(fp == NULL) printf("error\n"); //mudar
         fgets(pl_line, sizeof(pl_line), fp);
-        printf("pl line %s\n", pl_line);
         sscanf(pl_line, "%d %d %s %d %d", &score, &plid, word, &n_succ, &n_trials);
+        printf("mmmm %s %d\n", word, n_succ);
         fclose(fp);
 
-        char new_line[100];
+        char new_line[148];
         memset(spaces_1, ' ', (40 - strlen(word)));
         memset(spaces_2, ' ', 13);
-        sprintf(new_line, " %d - %d  %d  %s%s%d%s%d\n", i, score, plid, word, spaces_1, n_succ, spaces_2, n_trials);
+        sprintf(new_line, " %d - %03d  %06d  %s%s%d%s%d\n", (i-1), score, plid, word, spaces_1, n_succ, spaces_2, n_trials);
+        printf("123 %s\n", new_line);
         n = strlen(new_line);
         tcpSendToClient(new_line);
-        free(player_score[i-1]);
+        free(player_score[i]);
     }
     free(player_score);
 
@@ -430,7 +432,7 @@ int guess(char plid[], char guess_word[], int trial){
     if(strcmp(word, guess_word) == 0){
         sprintf(send, "RWG WIN %d\n", trial);
         changeGameDir(game_file, plid, 'W');
-        //falta um scoreCreate();
+        //scoreCreate(n_succ, n_wrong, plid, game_file, word);
     }
     else{
         if((trial - getMaxErrors(strlen(word))) <= 0){
