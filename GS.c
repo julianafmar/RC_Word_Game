@@ -32,7 +32,7 @@ char buffer[128];
 
 int start(char plid[], char word_file[]);
 int play(char plid[], char letter, int trial);
-void guess(char plid[], char guess_word[], int trial);
+int guess(char plid[], char guess_word[], int trial);
 void quit(char plid[]);
 void scoreboard(int pid);
 int getMaxErrors(int word_len);
@@ -58,7 +58,7 @@ int main(int argc, char *argv[]){
             verbose = TRUE;
         }
     }
-
+    printf("in");
     //UDP
     udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if(udp_fd == -1) exit(1);
@@ -70,6 +70,7 @@ int main(int argc, char *argv[]){
     if(errcode != 0) exit(1);
     n = bind(udp_fd, udp_res->ai_addr, udp_res->ai_addrlen);
     if(n == -1) exit(1);
+    printf("me");
 
     //TCP
     tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -83,6 +84,8 @@ int main(int argc, char *argv[]){
     n = bind(tcp_fd, tcp_res->ai_addr, tcp_res->ai_addrlen);
     if(n == -1) exit(1);
     if(listen(tcp_fd, 5) == -1) exit(1);
+
+    printf("qqqqqqqq");
 
     if ((pid = fork()) == 0){
         //UDP
@@ -121,6 +124,8 @@ int main(int argc, char *argv[]){
         }
     }
 
+    printf("hhhhhh");
+
     if (pid > 0){
         //TCP
         while(1){
@@ -134,6 +139,7 @@ int main(int argc, char *argv[]){
             ptr += strlen(command);
 
             if(strcmp(command, "GSB") == 0){
+                printf("kkkkk");
                 scoreboard(pid);
             }
         }
@@ -148,7 +154,8 @@ void udpSendToClient(char buffer[]){
 
 void tcpSendToClient(char buffer[]){
     n = write(tcp_fd, buffer, n);
-    if(n == -1) exit(1);
+    if(n == -1) printf("1");
+    printf("TCP: %s, %ld", buffer, n);
 }
 
 int start(char plid[], char word_file[]){
@@ -337,6 +344,7 @@ int play(char plid[], char letter, int trial){
 
 void scoreboard(int pid){
     char send[129];
+    printf("scoreboard");
 
     sprintf(send, "\n-------------------------------- TOP 10 SCORES --------------------------------\n\n");
     n = 83;
@@ -401,7 +409,7 @@ void scoreboard(int pid){
     //tcpSendToClient();
 }
 
-void guess(char plid[], char guess_word[], int trial){
+int guess(char plid[], char guess_word[], int trial){
     char game_file[FILE_SIZE];
     char send[80];
     char play_wl[WORD_SIZE];
@@ -411,6 +419,7 @@ void guess(char plid[], char guess_word[], int trial){
     
     if(access(game_file, F_OK) != 0){
         udpSendToClient("RWG ERR\n");
+        return 0;
     }
     
     FILE *fp = fopen(game_file, "rw");
@@ -419,8 +428,8 @@ void guess(char plid[], char guess_word[], int trial){
     char line[50];
     fgets(line, sizeof(line), fp);
     sscanf(line, "%s", word);
+
     int i = 1;
-    
     for(; fgets(line, sizeof(line), fp) != NULL; i++){}
 
     if(i != trial){
@@ -445,6 +454,7 @@ void guess(char plid[], char guess_word[], int trial){
     }
     udpSendToClient(send);
     fclose(fp);
+    return 0;
 }
 
 void quit(char plid[]){

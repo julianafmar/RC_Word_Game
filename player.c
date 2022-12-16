@@ -46,7 +46,7 @@ int main(int argc, char *argv[]){
         else if(strcmp(token_list[0], "guess")== 0 || strcmp(token_list[0], "gw") == 0){
             guess(token_list[1]);
         }
-        else if(strcmp(token_list[0], "scorebord") == 0 || strcmp(token_list[0], "sb") == 0){
+        else if(strcmp(token_list[0], "scoreboard") == 0 || strcmp(token_list[0], "sb") == 0){
             scoreboard();
         }
         else if(strcmp(token_list[0], "hint") == 0 || strcmp(token_list[0], "h") == 0){
