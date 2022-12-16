@@ -30,6 +30,7 @@ struct addrinfo udp_hints, tcp_hints, *udp_res, *tcp_res;
 struct sockaddr_in addr;
 char buffer[128];
 
+void verbosePrint(char plid[], char command[]);
 int start(char plid[], char word_file[]);
 int play(char plid[], char letter, int trial);
 int guess(char plid[], char guess_word[], int trial);
@@ -43,14 +44,14 @@ void scoreCreate(int n_succ, int n_wrong, char plid[], char filename[], char wor
 int main(int argc, char *argv[]){
     pid_t pid;
     int n_trials = 0;
-    char command[3];
-    char plid[6];
+    char command[4];
+    char plid[7];
     char word_file[FILE_SIZE];
     char GSport[PORT_SIZE];
     strcpy(GSport, DEFAULT_GSport);
     strcpy(word_file, argv[1]);
 
-    for(int i = 0; i < argc - 1; i++){
+    for(int i = 0; i < argc; i++){
         if(strcmp(argv[i], "-p") == 0){
             strcpy(GSport, argv[i+1]);
         }
@@ -58,7 +59,7 @@ int main(int argc, char *argv[]){
             verbose = TRUE;
         }
     }
-    printf("in");
+
     //UDP
     udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if(udp_fd == -1) exit(1);
@@ -70,7 +71,6 @@ int main(int argc, char *argv[]){
     if(errcode != 0) exit(1);
     n = bind(udp_fd, udp_res->ai_addr, udp_res->ai_addrlen);
     if(n == -1) exit(1);
-    printf("me");
 
     //TCP
     tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -85,8 +85,6 @@ int main(int argc, char *argv[]){
     if(n == -1) exit(1);
     if(listen(tcp_fd, 5) == -1) exit(1);
 
-    printf("qqqqqqqq");
-
     if ((pid = fork()) == 0){
         //UDP
         while(1){
@@ -96,7 +94,7 @@ int main(int argc, char *argv[]){
 
             char *ptr = buffer;
             sscanf(ptr, "%s", command);
-            ptr += strlen(command);
+            ptr += strlen(command) + 1;
 
             if(strcmp(command, "SNG") == 0){
                 sscanf(ptr, "%s", plid);
@@ -121,10 +119,12 @@ int main(int argc, char *argv[]){
                 sscanf(ptr, "%s", plid);
                 quit(plid);
             }
+
+            if(verbose == TRUE){
+                verbosePrint(plid, command);
+            }
         }
     }
-
-    printf("hhhhhh");
 
     if (pid > 0){
         //TCP
@@ -139,23 +139,35 @@ int main(int argc, char *argv[]){
             ptr += strlen(command);
 
             if(strcmp(command, "GSB") == 0){
-                printf("kkkkk");
+                printf("kkkkk %d", pid);
                 scoreboard(pid);
             }
+            /*if(verbose){
+                verbosePrint(plid, command);
+            }*/
         }
     }
+}
+
+void verbosePrint(char plid[], char command[]){
+    struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&addr;
+    struct in_addr ipAddr = pV4Addr->sin_addr;
+
+    char str[INET_ADDRSTRLEN];
+    inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
+    printf("%s %s %s %d\n", plid, command, inet_ntoa(addr.sin_addr), (int) ntohs(addr.sin_port));
 }
 
 void udpSendToClient(char buffer[]){
     n = sendto(udp_fd, buffer, n, 0, (struct sockaddr*) &addr, addrlen);
     if(n == -1) exit(1);
-    printf("UDP: %s, %ld", buffer, n);
+    //printf("UDP: %s, %ld", buffer, n);
 }
 
 void tcpSendToClient(char buffer[]){
     n = write(tcp_fd, buffer, n);
     if(n == -1) printf("1");
-    printf("TCP: %s, %ld", buffer, n);
+    //printf("TCP: %s, %ld", buffer, n);
 }
 
 int start(char plid[], char word_file[]){
@@ -178,7 +190,7 @@ int start(char plid[], char word_file[]){
                 sscanf(line, "%s", word);
             }
         }
-        printf("%d", i);
+        
         if(i == 1){
             word_len = strlen(word);
             max_errors = getMaxErrors(word_len);
@@ -280,7 +292,6 @@ int play(char plid[], char letter, int trial){
         fclose(fp);
         return 0;
     }
-    printf("a\n");
     if(strchr(word, letter) != NULL){
         int new_pos = 0;
         char positions[50] = "";
@@ -296,9 +307,8 @@ int play(char plid[], char letter, int trial){
         positions[strlen(positions)-1] = '\0';
 
         int tr = right_trials + new_pos;
-        printf("x%sx, %d, %ld, %d, %d\n", positions, tr, strlen(word), wrong_trials, right_trials);
+        
         if(tr == strlen(word)){
-            printf("b");
             char write[WORD_SIZE];
             sprintf(write, "T %c\n", letter);
             fileWrite(game_file, write, "a");
@@ -313,7 +323,6 @@ int play(char plid[], char letter, int trial){
             sprintf(write, "T %c\n", letter);
             fileWrite(game_file, write, "a");
             sprintf(send, "RLG OK %d %d %s\n", right_trials+wrong_trials, new_pos, positions);
-            printf("send %s\n", send);
             n = strlen(send);
             udpSendToClient(send);
             fclose(fp);

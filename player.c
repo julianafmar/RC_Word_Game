@@ -16,6 +16,7 @@ int main(int argc, char *argv[]){
     strcpy(GSIP, IPbuffer);
 
     for(int i = 0; i < argc - 1; i++){
+        //ver o -1
         if(strcmp(argv[i], "-p") == 0){
             strcpy(GSport, argv[i+1]);
         }
