@@ -23,7 +23,7 @@
 #define WORD_SIZE 100
 
 int verbose = FALSE;
-int udp_fd, tcp_fd, errcode;
+int udp_fd, tcp_fd, newfd, errcode;
 ssize_t n;
 socklen_t addrlen;
 struct addrinfo udp_hints, tcp_hints, *udp_res, *tcp_res;
@@ -35,7 +35,7 @@ int start(char plid[], char word_file[]);
 int play(char plid[], char letter, int trial);
 int guess(char plid[], char guess_word[], int trial);
 void quit(char plid[]);
-void scoreboard(int pid);
+int scoreboard(int pid);
 int getMaxErrors(int word_len);
 void fileWrite(char file_name[], char write[], char type[]);
 void changeGameDir(char filename[], char plid[], char code);
@@ -130,7 +130,7 @@ int main(int argc, char *argv[]){
         //TCP
         while(1){
             addrlen = sizeof(addr);
-            int newfd = accept(tcp_fd, (struct sockaddr*) &addr, &addrlen);
+            newfd = accept(tcp_fd, (struct sockaddr*) &addr, &addrlen);
             if(newfd == -1) exit(1);
             n = read(newfd, buffer, 128);
             if(n == -1) exit(1);
@@ -149,15 +149,6 @@ int main(int argc, char *argv[]){
     }
 }
 
-void verbosePrint(char plid[], char command[]){
-    struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&addr;
-    struct in_addr ipAddr = pV4Addr->sin_addr;
-
-    char str[INET_ADDRSTRLEN];
-    inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
-    printf("%s %s %s %d\n", plid, command, inet_ntoa(addr.sin_addr), (int) ntohs(addr.sin_port));
-}
-
 void udpSendToClient(char buffer[]){
     n = sendto(udp_fd, buffer, n, 0, (struct sockaddr*) &addr, addrlen);
     if(n == -1) exit(1);
@@ -165,9 +156,13 @@ void udpSendToClient(char buffer[]){
 }
 
 void tcpSendToClient(char buffer[]){
-    n = write(tcp_fd, buffer, n);
-    if(n == -1) printf("1");
-    //printf("TCP: %s, %ld", buffer, n);
+    int c = n;
+    while(c > 0){
+        n = write(newfd, buffer, c);
+        if(n == -1) exit(1);
+        c -= n;
+        printf("TCP: %s, %ld", buffer, n);
+    }
 }
 
 int start(char plid[], char word_file[]){
@@ -351,29 +346,45 @@ int play(char plid[], char letter, int trial){
     return 0;
 }
 
-void scoreboard(int pid){
+int scoreboard(int pid){
     char send[129];
     printf("scoreboard");
-
-    sprintf(send, "\n-------------------------------- TOP 10 SCORES --------------------------------\n\n");
-    n = 83;
-    tcpSendToClient(send);
-
-    sprintf(send, "    SCORE PLAYER     WORD                             GOOD TRIALS  TOTAL TRIALS\n\n");
-    n = 82;
-    tcpSendToClient(send);
 
     struct dirent **player_score;
     int m =  scandir("SCORES/", &player_score, NULL, alphasort);
     if(m < 0) perror("scandir");
     if(m > 10) m = 10;
+    printf("mm %d\n", m);
+    if(m == 0){
+        sprintf(send, "RSB EMPTY\n");
+        n = strlen(send);
+        printf("nn %ld\n", n);
+        tcpSendToClient(send);
+        return 0;
+    }
 
-    for(int i = 1; i <= 10; i++){
+    int total = 83 + 82 + m * 76;
+
+    sprintf(send, "RSB OK TOPSCORES_%d.txt %d\n", pid, total);
+    n = strlen(send);
+    tcpSendToClient(send);
+
+    sprintf(send, "\n-------------------------------- TOP 10 SCORES --------------------------------\n\n");
+    n = strlen(send);
+    tcpSendToClient(send);
+
+    sprintf(send, "    SCORE PLAYER     WORD                             GOOD TRIALS  TOTAL TRIALS\n\n");
+    n = strlen(send);
+    tcpSendToClient(send);
+
+    for(int i = 1; i <= m; i++){
         char pl_line[85], word[31], spaces_1[40], spaces_2[15];
         int score, plid, n_succ, n_trials;
 
         FILE *fp = fopen(player_score[i-1]->d_name, "r");
+        if(fp == NULL) printf("error\n");
         fgets(pl_line, sizeof(pl_line), fp);
+        printf("pl line %s\n", pl_line);
         sscanf(pl_line, "%d %d %s %d %d", &score, &plid, word, &n_succ, &n_trials);
         fclose(fp);
 
@@ -383,39 +394,11 @@ void scoreboard(int pid){
         sprintf(new_line, " %d - %d  %d  %s%s%d%s%d\n", i, score, plid, word, spaces_1, n_succ, spaces_2, n_trials);
         n = strlen(new_line);
         tcpSendToClient(new_line);
+        free(player_score[i-1]);
     }
+    free(player_score);
 
-    /*char filename[20];
-
-    sprintf(filename, "TOPSCORES_%d.txt", pid);
-    FILE *score_file = fopen(filename, "w");
-    if(score_file == NULL) exit(1);
-
-    fwrite("\n-------------------------------- TOP 10 SCORES --------------------------------\n\n", 1, 83, score_file);
-    fwrite("    SCORE PLAYER     WORD                             GOOD TRIALS  TOTAL TRIALS\n\n", 1, 81, score_file);
-
-    struct dirent **player_score;
-    int m =  scandir("SCORES/", &player_score, NULL, alphasort);
-    if(m < 0) perror("scandir");
-
-    if(m > 10) m = 10;
-    for(int i = 1; i <= 10; i++){
-        char pl_line[85], word[31], spaces_1[45], spaces_2[45];
-        int score, plid, n_succ, n_trials;
-
-        FILE *fp = fopen(player_score[i-1]->d_name, "r");
-        fgets(pl_line, sizeof(pl_line), fp);
-        sscanf(pl_line, "%d %d %s %d %d", &score, &plid, word, &n_succ, &n_trials);
-        fclose(fp);
-
-        char new_line[190];
-        memset(spaces_1, ' ', (40 - strlen(word)));
-        memset(spaces_2, ' ', 13);
-        sprintf(new_line, " %d - %d  %d  %s%s%d%s%d\n", i, score, plid, word, spaces_1, n_succ, spaces_2, n_trials);
-    }
-    fclose(score_file);*/
-
-    //tcpSendToClient();
+    return 0;
 }
 
 int guess(char plid[], char guess_word[], int trial){
@@ -542,4 +525,13 @@ void scoreCreate(int n_succ, int n_wrong, char plid[], char filename[], char wor
 
     fwrite(write, 1, strlen(write), fp);
     fclose(fp);
+}
+
+void verbosePrint(char plid[], char command[]){
+    struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&addr;
+    struct in_addr ipAddr = pV4Addr->sin_addr;
+
+    char str[INET_ADDRSTRLEN];
+    inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
+    printf("%s %s %s %d\n", plid, command, inet_ntoa(addr.sin_addr), (int) ntohs(addr.sin_port));
 }

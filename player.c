@@ -170,9 +170,11 @@ void communication_tcp(char *send){
 
     n = write(tcp_fd, send, strlen(send));
     if(n == -1) exit(1);
+    printf("envia %s\n", send);
 
     n = read(tcp_fd, buffer, 128);
     if(n == -1) exit(1);
+    printf("1 %s, %ld\n", buffer, n);
     buffer[129] = '\0';
     if(n < 128 && n != 0){
         char *buf = buffer;
@@ -182,10 +184,10 @@ void communication_tcp(char *send){
         if(n == -1) exit(1);
         buffer[129] = '\0';
         n = 128;
+        printf("if %s, %ld\n", buffer, n);
     }
     
     received_tcp(buffer);
-    
     freeaddrinfo(tcp_res);
     close(tcp_fd);
 }
@@ -277,6 +279,7 @@ void received_tcp(char *received){
     char Fsize[28];
     
     sscanf(received, "%s", command);
+    printf("com %s\n", command);
     if(strcmp(command, "RSB") == 0){
         received += 4;
         sscanf(received, "%s", status);
