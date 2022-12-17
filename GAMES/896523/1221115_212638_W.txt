@@ -1,0 +1,11 @@
+helicoidal Helix.svg
+T a
+T e
+T i
+T o
+T u
+T p
+T l
+T h
+T d
+T c

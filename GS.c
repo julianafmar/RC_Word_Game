@@ -40,6 +40,8 @@ int getMaxErrors(int word_len);
 void fileWrite(char file_name[], char write[], char type[]);
 void changeGameDir(char filename[], char plid[], char code);
 void scoreCreate(int n_succ, int n_wrong, char plid[], char filename[], char word[]);
+void udpSendToClient(char buffer[]);
+void tcpSendToClient(char buffer[], int c);
 
 int main(int argc, char *argv[]){
     pid_t pid;
@@ -151,11 +153,10 @@ int main(int argc, char *argv[]){
 void udpSendToClient(char buffer[]){
     n = sendto(udp_fd, buffer, n, 0, (struct sockaddr*) &addr, addrlen);
     if(n == -1) exit(1);
-    //printf("UDP: %s, %ld", buffer, n);
+    printf("UDP: %s, %ld", buffer, n);
 }
 
-void tcpSendToClient(char buffer[]){
-    int c = n;
+void tcpSendToClient(char buffer[], int c){
     while(c > 0){
         n = write(newfd, buffer, c);
         if(n == -1) exit(1);
@@ -165,13 +166,17 @@ void tcpSendToClient(char buffer[]){
 }
 
 int start(char plid[], char word_file[]){
-    //add err
     char game_file[FILE_SIZE];
     int word_len;
     char word[30];
     char send[80];
     char line[50];
     int max_errors;
+
+    if((strlen(plid) != 6) || (strlen(buffer) != 11)){
+        udpSendToClient("RSG ERR\n");
+        return 0;
+    } 
 
     sprintf(game_file, "GAME_%s.txt", plid);
     if(access(game_file, F_OK) == 0){
@@ -240,7 +245,9 @@ int play(char plid[], char letter, int trial){
     sprintf(game_file, "GAME_%s.txt", plid);
     
     if(access(game_file, F_OK) != 0){
-        udpSendToClient("RLG ERR\n");
+        sprintf(send, "RLG ERR %d\n", trial);
+        n = strlen(send);
+        udpSendToClient(send);
         return 0;
     }
     
@@ -280,9 +287,20 @@ int play(char plid[], char letter, int trial){
             }
                 
         }
+        if(strcmp("G", code) == 0){
+            if(strcmp(word, play_wl) == 0){
+                right_trials++;
+            }
+            else{
+                wrong_trials++;
+            }
+        }
     }
+    printf("GS t %d i %d\n", trial, i);
     if(i != trial){
-        udpSendToClient("RLG INV\n");
+        sprintf(send, "RLG INV %d\n", trial);
+        n = strlen(send);
+        udpSendToClient(send);
         fclose(fp);
         return 0;
     }
@@ -308,7 +326,9 @@ int play(char plid[], char letter, int trial){
             fileWrite(game_file, write, "a");
             scoreCreate(tr, wrong_trials, plid, game_file, word);
             changeGameDir(game_file, plid, 'W');
-            udpSendToClient("RLG WIN\n");
+            sprintf(send, "RLG WIN %d\n", trial);
+            n = strlen(send);
+            udpSendToClient(send);
             fclose(fp);
             return 0;
         }
@@ -316,7 +336,7 @@ int play(char plid[], char letter, int trial){
             char write[WORD_SIZE];
             sprintf(write, "T %c\n", letter);
             fileWrite(game_file, write, "a");
-            sprintf(send, "RLG OK %d %d %s\n", right_trials+wrong_trials, new_pos, positions);
+            sprintf(send, "RLG OK %d %d %s\n", (right_trials+wrong_trials), new_pos, positions);
             n = strlen(send);
             udpSendToClient(send);
             fclose(fp);
@@ -328,7 +348,9 @@ int play(char plid[], char letter, int trial){
         sprintf(write, "T %c\n", letter);
         fileWrite(game_file, write, "a");
         changeGameDir(game_file, plid, 'F');
-        udpSendToClient("RLG OVR\n");
+        sprintf(send, "RLG OVR %d\n", trial);
+        n = strlen(send);
+        udpSendToClient(send);
         fclose(fp);
         return 0;
     }
@@ -336,7 +358,9 @@ int play(char plid[], char letter, int trial){
         char write[WORD_SIZE];
         sprintf(write, "T %c\n", letter);
         fileWrite(game_file, write, "a");
-        udpSendToClient("RLG NOK\n");
+        sprintf(send, "RLG NOK %d\n", trial);
+        n = strlen(send);
+        udpSendToClient(send);
         fclose(fp);
         return 0;
     }
@@ -351,51 +375,52 @@ int scoreboard(int pid){
     struct dirent **player_score;
     int m =  scandir("SCORES/", &player_score, NULL, alphasort);
     if(m < 0) perror("scandir");
-    printf("%s | %s | %s | %s\n", player_score[0]->d_name, player_score[1]->d_name, player_score[2]->d_name, player_score[3]->d_name);
-    printf("mm %d\n", m);
-    if(m > 10) m = 10;
+    if(m > 12) m = 12;
     
-    if(m == 0){
+    if(m == 2){
         sprintf(send, "RSB EMPTY\n");
         n = strlen(send);
-        printf("nn %ld\n", n);
-        tcpSendToClient(send);
+        tcpSendToClient(send, strlen(send));
         return 0;
     }
 
     int total = 83 + 82 + (m-2) * 75;
 
     sprintf(send, "RSB OK TOPSCORES_%d.txt %d\n", pid, total);
-    n = strlen(send);
-    tcpSendToClient(send);
+    tcpSendToClient(send, strlen(send));
 
     sprintf(send, "\n-------------------------------- TOP 10 SCORES --------------------------------\n\n");
-    n = strlen(send);
-    tcpSendToClient(send);
+    tcpSendToClient(send, strlen(send));
 
     sprintf(send, "    SCORE PLAYER     WORD                             GOOD TRIALS  TOTAL TRIALS\n\n");
-    n = strlen(send);
-    tcpSendToClient(send);
+    tcpSendToClient(send, strlen(send));
 
-    for(int i = 2; i < m; i++){
+    int count = 1;
+    for(int i = (m-1); i >= 2; i--){
         char pl_line[85], word[31], spaces_1[40], spaces_2[15], aux[263];
         int score, plid, n_succ, n_trials;
 
         sprintf(aux, "SCORES/%s", player_score[i]->d_name);
         FILE *fp = fopen(aux, "r");
-        if(fp == NULL) printf("error\n"); //mudar
+        if(fp == NULL) exit(1);
         fgets(pl_line, sizeof(pl_line), fp);
         sscanf(pl_line, "%d %d %s %d %d", &score, &plid, word, &n_succ, &n_trials);
-        printf("mmmm %s %d\n", word, n_succ);
         fclose(fp);
 
         char new_line[148];
         memset(spaces_1, ' ', (40 - strlen(word)));
-        memset(spaces_2, ' ', 13);
-        sprintf(new_line, " %d - %03d  %06d  %s%s%d%s%d\n", (i-1), score, plid, word, spaces_1, n_succ, spaces_2, n_trials);
-        printf("123 %s\n", new_line);
-        n = strlen(new_line);
-        tcpSendToClient(new_line);
+        spaces_1[(40 - strlen(word))] = '\0';
+        
+        int n_sp;
+        if(n_succ < 10) n_sp = 14;
+        else n_sp = 13;
+        memset(spaces_2, ' ', n_sp);
+        spaces_2[n_sp] = '\0';
+        
+        if(count == 10) sprintf(new_line, "%d - %03d  %06d  %s%s%d%s%d\n", count, score, plid, word, spaces_1, n_succ, spaces_2, n_trials);
+        else sprintf(new_line, " %d - %03d  %06d  %s%s%d%s%d\n", count, score, plid, word, spaces_1, n_succ, spaces_2, n_trials);
+        count++;
+        tcpSendToClient(new_line, strlen(new_line));
         free(player_score[i]);
     }
     free(player_score);
@@ -406,8 +431,10 @@ int scoreboard(int pid){
 int guess(char plid[], char guess_word[], int trial){
     char game_file[FILE_SIZE];
     char send[80];
+    char code[2];
     char play_wl[WORD_SIZE];
     char word[WORD_SIZE];
+    int n_succ = 0, n_wrong = 0;
 
     sprintf(game_file, "GAME_%s.txt", plid);
     
@@ -424,15 +451,39 @@ int guess(char plid[], char guess_word[], int trial){
     sscanf(line, "%s", word);
 
     int i = 1;
-    for(; fgets(line, sizeof(line), fp) != NULL; i++){}
-
+    for(; fgets(line, sizeof(line), fp) != NULL; i++){
+        sscanf(line, "%s %s", code, play_wl);
+        if(strcmp(code, "T") == 0){
+            if(strstr(word, play_wl) != NULL){
+                for(int j = 0; j < strlen(word); j++){
+                    char *let = play_wl;
+                    if(word[j] == *let){
+                        n_succ++;
+                    }
+                }
+            }
+            else{
+                n_wrong++;
+            }
+        }
+        else if(strcmp(code, "G") == 0){
+            if(strcmp(word, play_wl) == 0){
+                n_succ++;
+            }
+            else{
+                n_wrong++;
+            }
+        }
+    }
+    
     if(i != trial){
         udpSendToClient("RWG INV\n");
     }
     if(strcmp(word, guess_word) == 0){
         sprintf(send, "RWG WIN %d\n", trial);
         changeGameDir(game_file, plid, 'W');
-        //scoreCreate(n_succ, n_wrong, plid, game_file, word);
+
+        scoreCreate(n_succ, n_wrong, plid, game_file, word);
     }
     else{
         if((trial - getMaxErrors(strlen(word))) <= 0){

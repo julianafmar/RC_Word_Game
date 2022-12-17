@@ -12,6 +12,10 @@
 #include <netdb.h>
 #include <stdio.h>
 
+#include <sys/ioctl.h>
+#include <netinet/in.h>
+#include <net/if.h>
+
 #define UNDERSCORE "_"
 #define WHITESPACE " "
 #define DEFAULT_GSport "58033"
@@ -29,7 +33,7 @@ struct addrinfo udp_hints, tcp_hints, *udp_res, *tcp_res;
 struct sockaddr_in addr;
 
 char id[PLID_SIZE];
-int n_trials;
+int n_trials = 0;
 int max_errors;
 int n_letters;
 char word_spaces[WORD_SIZE];

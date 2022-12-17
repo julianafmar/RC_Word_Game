@@ -3,7 +3,7 @@
 int main(int argc, char *argv[]){
     strcpy(GSport, DEFAULT_GSport);
 
-    char hostbuffer[256];
+    /*char hostbuffer[256];
     char *IPbuffer;
     struct hostent *host_entry;
     int hostname;
@@ -14,6 +14,17 @@ int main(int argc, char *argv[]){
     IPbuffer = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
     if(IPbuffer == NULL) perror("inet_ntoa");
     strcpy(GSIP, IPbuffer);
+    printf("%s\n", GSIP);*/
+
+     int fdip;
+    struct ifreq ifr;
+
+    fdip = socket(AF_INET, SOCK_DGRAM, 0);
+    ifr.ifr_addr.sa_family = AF_INET;
+    strncpy(ifr.ifr_name, "eth0", IFNAMSIZ-1);
+    ioctl(fdip, SIOCGIFADDR, &ifr);
+    close(fdip);
+    strcpy(GSIP, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
 
     for(int i = 0; i < argc - 1; i++){
         //ver o -1
@@ -78,7 +89,7 @@ int main(int argc, char *argv[]){
 
 void start(char plid[]){
     char send[INPUT_SIZE];
-    n_trials = 1; //qnd ja existe jogo isto fica errado :/
+    n_trials++; //qnd ja existe jogo isto fica errado :/
     strcpy(id, plid);
     sprintf(send, "SNG %s\n", plid);
     communication_udp(send);
@@ -145,7 +156,6 @@ void communication_udp(char *send){
     n = recvfrom(udp_fd, buffer, 128, 0, (struct sockaddr*) &addr, &addrlen);
     if(n == -1) exit(1);
     buffer[129] = '\0';
-    printf("n %ld buf %sx\n", n, buffer);
 
     received_udp(buffer);
 
@@ -170,11 +180,9 @@ void communication_tcp(char *send){
 
     n = write(tcp_fd, send, strlen(send));
     if(n == -1) exit(1);
-    printf("envia %s\n", send);
 
     n = read(tcp_fd, buffer, 128);
     if(n == -1) exit(1);
-    printf("1 %s, %ld\n", buffer, n);
     buffer[129] = '\0';
     if(n < 128 && n != 0){
         char *buf = buffer;
@@ -184,7 +192,6 @@ void communication_tcp(char *send){
         if(n == -1) exit(1);
         buffer[129] = '\0';
         n = 128;
-        printf("if %s, %ld\n", buffer, n);
     }
     
     received_tcp(buffer);
@@ -208,6 +215,9 @@ void received_udp(char *received){
             n_letters = atoi(token_list[2]);
             memset(word_spaces, *UNDERSCORE, n_letters);
             printf("New game started. Guess %s letter word (max %s errors): %s\n", token_list[2], token_list[3], word_spaces);
+        }
+        else if(strcmp(token_list[1], "ERR") == 0){
+            printf("RSG ERR\n");
         }
     }
     else if(strcmp(token_list[0], "RLG") == 0){
