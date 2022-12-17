@@ -193,6 +193,7 @@ void communication_tcp(char *send){
         buffer[129] = '\0';
         n = 128;
     }
+    printf("bb %s\n", buffer);
     
     received_tcp(buffer);
     freeaddrinfo(tcp_res);
@@ -253,6 +254,9 @@ void received_udp(char *received){
     else if(strcmp(token_list[0], "RWG") == 0){
         if(strcmp(token_list[1], "WIN") == 0){
             printf("You won!\n");
+        }
+        else if(strcmp(token_list[1], "DUP") == 0){
+            printf("You already tried this word.\n");
         }
         else if(strcmp(token_list[1], "NOK") == 0){    
             n_trials++;
