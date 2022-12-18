@@ -234,8 +234,7 @@ void received_udp(char *received){
             printf("Word: %s\n", word_spaces);
         }
         else if(strcmp(token_list[1], "WIN") == 0){
-            printf("You won!\n");
-            strcpy(id, "");
+            printf("You won!\n");ongoing
         }
         else if(strcmp(token_list[1], "DUP") == 0){
             printf("You already tried this letter.\n");
