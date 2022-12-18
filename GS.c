@@ -30,10 +30,9 @@ ssize_t n;
 socklen_t addrlen;
 struct addrinfo udp_hints, tcp_hints, *udp_res, *tcp_res;
 struct sockaddr_in addr;
-char buffer[128];
 
 void verbosePrint(char plid[], char command[]);
-int start(char plid[], char word_file[]);
+int start(char plid[], char word_file[], char buffer[]);
 int play(char plid[], char letter, int trial);
 int guess(char plid[], char guess_word[], int trial);
 void quit(char plid[]);
@@ -46,7 +45,7 @@ void changeGameDir(char filename[], char plid[], char code);
 void scoreCreate(int n_succ, int n_wrong, char plid[], char filename[], char word[]);
 void udpSendToClient(char buffer[]);
 void tcpSendToClient(char buffer[], int c);
-void tcpSendFile(FILE *fp, int size);
+void tcpSendFile(FILE *fp);
 int FindLastGame(char plid[], char *fname);
 
 int main(int argc, char *argv[]){
@@ -56,6 +55,7 @@ int main(int argc, char *argv[]){
     char plid[7];
     char word_file[FILE_SIZE];
     char GSport[PORT_SIZE];
+    char buffer[129];
     strcpy(GSport, DEFAULT_GSport);
     strcpy(word_file, argv[1]);
 
@@ -96,9 +96,11 @@ int main(int argc, char *argv[]){
     if ((pid = fork()) == 0){
         //UDP
         while(1){
+            memset(buffer, 0, strlen(buffer));
             addrlen = sizeof(addr);
             n = recvfrom(udp_fd, buffer, 128, 0, (struct sockaddr*) &addr, &addrlen);
             if(n == -1) exit(1);
+            buffer[129] = '\0';
 
             char *ptr = buffer;
             sscanf(ptr, "%s", command);
@@ -106,7 +108,8 @@ int main(int argc, char *argv[]){
 
             if(strcmp(command, "SNG") == 0){
                 sscanf(ptr, "%s", plid);
-                start(plid, word_file);
+                printf("xsdf %s, %sx\n", plid, buffer);
+                start(plid, word_file, buffer);
             }
 
             if(strcmp(command, "PLG") == 0){
@@ -137,11 +140,13 @@ int main(int argc, char *argv[]){
     if (pid > 0){
         //TCP
         while(1){
+            memset(buffer, 0, strlen(buffer));
             addrlen = sizeof(addr);
             newfd = accept(tcp_fd, (struct sockaddr*) &addr, &addrlen);
             if(newfd == -1) exit(1);
             n = read(newfd, buffer, 128);
             if(n == -1) exit(1);
+            buffer[129] = '\0';
             char *ptr = buffer;
             sscanf(ptr, "%s", command);
 
@@ -183,17 +188,16 @@ void tcpSendToClient(char buffer[], int c){
     }
 }
 
-void tcpSendFile(FILE *fp, int size){
+void tcpSendFile(FILE *fp){
     char send[SEND_SIZE];
-    int size_read, total = 0;
-    while(size != total){
+    int size_read;
+    while(!feof(fp)){
         size_read = fread(send, 1, sizeof(send) - 1, fp);
-        int x = write(newfd, send, size_read);
-        total += x;
+        write(newfd, send, size_read);
     }
 }
 
-int start(char plid[], char word_file[]){
+int start(char plid[], char word_file[], char buffer[]){
     char game_file[FILE_SIZE];
     int word_len;
     char word[30];
@@ -201,6 +205,7 @@ int start(char plid[], char word_file[]){
     char line[50];
     int max_errors;
 
+    printf("xqwe %s %sx\n", buffer, plid);
     if((strlen(plid) != 6) || (strlen(buffer) != 11)){
         udpSendToClient("RSG ERR\n");
         return 0;
@@ -324,7 +329,7 @@ int play(char plid[], char letter, int trial){
             }
         }
     }
-    printf("GS t %d i %d\n", trial, i);
+
     if(i != trial){
         sprintf(send, "RLG INV %d\n", trial);
         n = strlen(send);
@@ -550,7 +555,7 @@ void quit(char plid[]){
 
 void hint(char plid[]){
     char game_file[FILE_SIZE];
-    char send[80];
+    char send[129];
     char file_name[FNAME_SIZE], path_file[40];
     char word[WORD_SIZE];
     struct stat sb;
@@ -579,26 +584,25 @@ void hint(char plid[]){
     fseek(fp, 0L, SEEK_END);
     size = ftell(fp);
 
-    sprintf(send, "RHL OK %s %d\n", path_file, size);
-    printf("h %s\n", send);
+    sprintf(send, "RHL OK %s %d\n", file_name, size);
     tcpSendToClient(send, strlen(send));
 
-    int size_read, total = 0;
-    while(size != total){
+    fseek(fp, 0L, SEEK_SET);
+    int size_read;
+    while(size > 0){
         size_read = fread(send, 1, 128, fp);
         if(size_read == 0) break;
-        int x = write(newfd, send, size_read);
-        total += x;
+        send[129] = '\0';
+        tcpSendToClient(send, size_read);
+        size -= size_read;
     }
 
     fclose(fp);
 }
 
 void state(char plid[]){
-    /*char game_file[FILE_SIZE];
-    char send[80];
+    /*char game_file[FILE_SIZE], send[80], line[50], word[30], hint_file[24];
     char *Fname;
-    int size;
     FILE *fp;
 
     sprintf(game_file, "GAME_%s.txt", plid);
@@ -612,10 +616,28 @@ void state(char plid[]){
         else{
             fp = fopen(Fname, "r");
             if(fp == NULL) exit(1);
-            fseek(fp, 0, SEEK_END);
-            size = ftell(fp);
-            fseek(fp, 0, SEEK_SET);
+
+            char code, wl[30];
+            int count_words = 0, count_letters = 0, word_size = 0;
+            for(int i = 0; fgets(line, sizeof(line), fp) != NULL; i++){
+                if(i == 0){
+                    sscanf(line, "%s %s", word, hint_file);
+                }
+                else{
+                    sscanf(line, "%c %s", code, wl);
+                    if(code == "T") count_letters++;
+                    if(code == 'G'){
+                        count_words++;
+                        word_size += strlen(wl);
+                    }
+                }
+            }
+
+            int size = 38 + 6 + strlen(word) + 13 + strlen(hint_file) + 20 + (16 * count_letters) + (13 * count_words) + word_size + 18;
+
+            sprintf(Fname, "STATE_%s.txt", plid);
             sprintf(send, "RST FIN %s %d", Fname, size);
+
             tcpSendToClient(send, strlen(send));
             memset(send, 0, strlen(send));
             tcpSendFile(fp);
@@ -635,7 +657,8 @@ void state(char plid[]){
         tcpSendFile(fp);
         sprintf(send, "\n");
         tcpSendToClient(send, strlen(send));
-    }*/
+    }
+    fclose(fp);*/
 }
 
 int getMaxErrors(int word_len){

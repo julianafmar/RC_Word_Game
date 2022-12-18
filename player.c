@@ -16,7 +16,7 @@ int main(int argc, char *argv[]){
     strcpy(GSIP, IPbuffer);
     printf("%s\n", GSIP);*/
 
-     int fdip;
+    int fdip;
     struct ifreq ifr;
 
     fdip = socket(AF_INET, SOCK_DGRAM, 0);
@@ -89,7 +89,10 @@ int main(int argc, char *argv[]){
 
 void start(char plid[]){
     char send[INPUT_SIZE];
-    n_trials++; //qnd ja existe jogo isto fica errado :/
+    n_trials++;
+    if((strcmp(plid, id) != 0) && (strlen(id) != 0)){
+        n_trials = 1;
+    }
     strcpy(id, plid);
     sprintf(send, "SNG %s\n", plid);
     communication_udp(send);
@@ -193,7 +196,6 @@ void communication_tcp(char *send){
         buffer[129] = '\0';
         n = 128;
     }
-    printf("bb %s\n", buffer);
     
     received_tcp(buffer);
     freeaddrinfo(tcp_res);
@@ -209,6 +211,7 @@ void received_udp(char *received){
     }
     if(strcmp(token_list[0], "RSG") == 0){
         if(strcmp(token_list[1], "NOK") == 0){
+            n_trials--; // da errado na mesma
             printf("You already have an ongoing game.\n");
         }
         else if(strcmp(token_list[1], "OK") == 0){
@@ -232,6 +235,7 @@ void received_udp(char *received){
         }
         else if(strcmp(token_list[1], "WIN") == 0){
             printf("You won!\n");
+            strcpy(id, "");
         }
         else if(strcmp(token_list[1], "DUP") == 0){
             printf("You already tried this letter.\n");
@@ -293,7 +297,6 @@ void received_tcp(char *received){
     char Fsize[28];
     
     sscanf(received, "%s", command);
-    printf("com %s\n", command);
     if(strcmp(command, "RSB") == 0){
         received += 4;
         sscanf(received, "%s", status);

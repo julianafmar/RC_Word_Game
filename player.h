@@ -32,7 +32,7 @@ socklen_t addrlen;
 struct addrinfo udp_hints, tcp_hints, *udp_res, *tcp_res;
 struct sockaddr_in addr;
 
-char id[PLID_SIZE];
+char id[PLID_SIZE] = "";
 int n_trials = 0;
 int max_errors;
 int n_letters;
