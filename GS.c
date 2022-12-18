@@ -423,9 +423,11 @@ int scoreboard(int pid){
     tcpSendToClient(send, strlen(send));
 
     sprintf(send, "\n-------------------------------- TOP 10 SCORES --------------------------------\n\n");
+    send[86] = '\0';
     tcpSendToClient(send, strlen(send));
 
     sprintf(send, "    SCORE PLAYER     WORD                             GOOD TRIALS  TOTAL TRIALS\n\n");
+    send[84] = '\0';
     tcpSendToClient(send, strlen(send));
 
     int count = 1;

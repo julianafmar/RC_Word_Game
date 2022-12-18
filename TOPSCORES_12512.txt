@@ -1,0 +1,15 @@
+
+-------------------------------- TOP 10 SCORES --------------------------------
+
+    SCORE PLAYER     WORD                             GOOD TRIALS  TOTAL TRIALS
+
+ 1 - 068  322332  abracadabra                             11             16
+ 2 - 062  233223  helicoidal                              10             16
+ 3 - 062  099261  xiphophorus                             5              8
+ 4 - 061  322332  platypus                                8              13
+ 5 - 050  788778  joker                                   5              10
+ 6 - 050  099261  ferromagnetism                          2              4
+ 7 - 050  099261  helicoidal                              1              2
+ 8 - 100  099999  decarbonization                         6              6
+ 9 - 100  099261  electroencephalographical               5              5
+10 - 100  000000  lighthouse                              3              3
