@@ -500,8 +500,11 @@ int guess(char plid[], char guess_word[], int trial){
             }
         }
         else if(strcmp(code, "G") == 0){
-            if(strcmp(word, play_wl) == 0){
-                n_succ++;
+            if(strcmp(guess_word, play_wl) == 0){
+                sprintf(send, "RWG DUP %d\n", trial);
+                udpSendToClient(send);
+                fclose(fp);
+                return 0;
             }
             else{
                 n_wrong++;
@@ -540,15 +543,22 @@ void quit(char plid[]){
     char send[80];
     char play_wl[WORD_SIZE];
     char word[WORD_SIZE];
+    char path[FILE_SIZE];
 
-    sprintf(game_file, "GAME_%s.txt", plid);
-    
+    sprintf(game_file, "GAME%s.txt", plid);
+
     if(access(game_file, F_OK) != 0){
+        sprintf(path, "GAMES/%s", plid);
+        struct stat stats;
+        stat(path, &stats);
+        // Check if plid's directory exists
+        if (S_ISDIR(stats.st_mode)){
+            udpSendToClient("RQT NOK\n");
+            return;
+        }
         udpSendToClient("RQT ERR\n");
     }
     else{
-        freeaddrinfo(tcp_res);
-        close(tcp_fd);
         udpSendToClient("RQT OK\n");
     }
 }
@@ -601,19 +611,25 @@ void hint(char plid[]){
 }
 
 void state(char plid[]){
-    /*char game_file[FILE_SIZE], send[80], line[50], word[30], hint_file[24];
-    char *Fname;
+    char game_file[FILE_SIZE], send[305], line[50], word[30], hint_file[24], path[30];
+    char Fname[285];
     FILE *fp;
 
     sprintf(game_file, "GAME_%s.txt", plid);
 
     if(access(game_file, F_OK) != 0){
-        if(FindLastGame(plid, Fname) == 0){
+        struct dirent **player_score;
+        sprintf(path, "GAMES/%s/", plid);
+        int m =  scandir(path, &player_score, NULL, alphasort);
+        if(m < 0) perror("scandir");
+
+        if(m == 0){
             sprintf(send, "RST NOK\n");
             tcpSendToClient(send, strlen(send));
             memset(send, 0, strlen(send));
         }
         else{
+            sprintf(Fname, "%s%s", path, player_score[m-1]->d_name);
             fp = fopen(Fname, "r");
             if(fp == NULL) exit(1);
 
@@ -624,8 +640,8 @@ void state(char plid[]){
                     sscanf(line, "%s %s", word, hint_file);
                 }
                 else{
-                    sscanf(line, "%c %s", code, wl);
-                    if(code == "T") count_letters++;
+                    sscanf(line, "%c %s", &code, wl);
+                    if(code == 'T') count_letters++;
                     if(code == 'G'){
                         count_words++;
                         word_size += strlen(wl);
@@ -634,31 +650,116 @@ void state(char plid[]){
             }
 
             int size = 38 + 6 + strlen(word) + 13 + strlen(hint_file) + 20 + (16 * count_letters) + (13 * count_words) + word_size + 18;
+            int transactions = count_letters + count_words;
 
             sprintf(Fname, "STATE_%s.txt", plid);
+            Fname[17] = '\0';
             sprintf(send, "RST FIN %s %d", Fname, size);
 
             tcpSendToClient(send, strlen(send));
             memset(send, 0, strlen(send));
-            tcpSendFile(fp);
-            sprintf(send, "\n");
+            
+            sprintf(send, "Last finalized game for player %s\n", plid);
             tcpSendToClient(send, strlen(send));
+
+            sprintf(send, "Word: %s, Hint file: %s\n", word, hint_file);
+            tcpSendToClient(send, strlen(send));
+
+            sprintf(send, "Transactions found: %d\n", transactions);
+            tcpSendToClient(send, strlen(send));
+
+            fgets(line, sizeof(line), fp);
+            for(int i = 0; fgets(line, sizeof(line), fp) != NULL; i++){
+                sscanf(line, "%c %s", &code, wl);
+                if(code == 'G'){
+                    sprintf(send, "Word guess: %s\n", wl);
+                    tcpSendToClient(send, strlen(send));
+                }
+                else if(code == 'T'){
+                    sprintf(send, "Letter trial: %s\n", wl);
+                    tcpSendToClient(send, strlen(send));
+                }
+            }
+
+            if(strstr(Fname, "W") != NULL){
+                sprintf(send, "Termination: WIN\n");
+                tcpSendToClient(send, strlen(send));
+            }
+            else{
+                sprintf(send, "Termination: FAIL\n");
+                tcpSendToClient(send, strlen(send));
+            }
         }
     }
     else{
         fp = fopen(game_file, "r");
         if(fp == NULL) exit(1);
-        fseek(fp, 0, SEEK_END);
-        size = ftell(fp);
-        fseek(fp, 0, SEEK_SET);
+        int n_trues = 0, n_falses = 0;
+        char code[2], wl[30];
+        int count_words = 0, count_letters = 0, word_size = 0, i;
+
+        for(i = 0; fgets(line, sizeof(line), fp) != NULL; i++){
+            if(i == 0){
+                sscanf(line, "%s %s", word, hint_file);
+            }
+            else{
+                sscanf(line, "%c %s", code, wl);
+                if(code == "T") {
+                    if(strstr(word, wl)){
+                        n_trues++;
+                    }
+                    else{
+                        n_falses++;
+                    }
+                }
+                if(code == "G"){
+                    count_words++;
+                    word_size += strlen(wl);
+                }
+            }
+        }
+        int transactions = i;
+
+        int size = 30 + 6 + 22 + 13 + 23*n_trues + 24*n_falses + (21 * count_words) + word_size + 16 + strlen(word);
+
+        sprintf(Fname, "STATE_%s.txt", plid);
         sprintf(send, "RST ACT %s %d", game_file, size);
+
+        sprintf(send, "Active game found for player %s\n", plid);
         tcpSendToClient(send, strlen(send));
-        memset(send, 0, strlen(send));
-        tcpSendFile(fp);
-        sprintf(send, "\n");
+
+        sprintf(send, "Transactions found: %d\n", transactions);
         tcpSendToClient(send, strlen(send));
+
+        char word_so_far[WORD_SIZE];
+        memset(word_so_far, '_', strlen(word_so_far));
+        for(i = 1; fgets(line, sizeof(line), fp) != NULL; i++){
+            sscanf(line, "%c %s", code, wl);
+            if (code == "T"){
+                if(strstr(word, wl)){
+                    sprintf(send, "Letter trial: %s - TRUE\n", wl);
+                    tcpSendToClient(send, strlen(send));
+                    for(int j = 0; j < strlen(word); j++){
+                        char *let = wl;
+                        if(word[j] == *let){
+                            word_so_far[j] = *let;
+                        }
+                    }
+                }
+                else{
+                    sprintf(send, "Letter trial: %s - FALSE\n", wl);
+                    tcpSendToClient(send, strlen(send));
+                }
+            }
+            if(code == "G"){
+                sprintf(send, "Word guess: %s - FALSE\n", wl);
+                tcpSendToClient(send, strlen(send));
+            }
+        }
+        word_so_far[strlen(word)] = '\0';
+        sprintf(send, "Solved so far: %s\n", word_so_far);
     }
-    fclose(fp);*/
+    fclose(fp);
 }
 
 int getMaxErrors(int word_len){
@@ -743,7 +844,8 @@ int FindLastGame(char plid[], char *fname){
         return 0;
     }
     else{
-        while(n_entries --){
+        while(n_entries--){
+            printf("%d %s\n", n_entries, player_games[n_entries]->d_name);
             if(player_games[n_entries]->d_name[0] != '.'){
                 sprintf(fname, "GAMES/%s/%s", plid, player_games[n_entries]->d_name);
                 found = 1;

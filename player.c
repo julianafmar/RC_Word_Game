@@ -234,7 +234,7 @@ void received_udp(char *received){
             printf("Word: %s\n", word_spaces);
         }
         else if(strcmp(token_list[1], "WIN") == 0){
-            printf("You won!\n");ongoing
+            printf("You won!\n");
         }
         else if(strcmp(token_list[1], "DUP") == 0){
             printf("You already tried this letter.\n");
@@ -278,6 +278,9 @@ void received_udp(char *received){
     else if(strcmp(token_list[0], "RQT") == 0){
         if(strcmp(token_list[1], "OK") == 0){
             printf("Goodbye!\n");
+        }
+        else if(strcmp(token_list[1], "NOK") == 0){
+            printf("You don't have an ongoing game\n");
         }
         else if(strcmp(token_list[1], "ERR") == 0){
             printf("RQT ERR\n");
