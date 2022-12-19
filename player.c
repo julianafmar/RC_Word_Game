@@ -3,7 +3,7 @@
 int main(int argc, char *argv[]){
     strcpy(GSport, DEFAULT_GSport);
 
-    /*char hostbuffer[256];
+    char hostbuffer[256];
     char *IPbuffer;
     struct hostent *host_entry;
     int hostname;
@@ -14,9 +14,8 @@ int main(int argc, char *argv[]){
     IPbuffer = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
     if(IPbuffer == NULL) perror("inet_ntoa");
     strcpy(GSIP, IPbuffer);
-    printf("%s\n", GSIP);*/
 
-    int fdip;
+    /*int fdip;
     struct ifreq ifr;
 
     fdip = socket(AF_INET, SOCK_DGRAM, 0);
@@ -24,7 +23,7 @@ int main(int argc, char *argv[]){
     strncpy(ifr.ifr_name, "eth0", IFNAMSIZ-1);
     ioctl(fdip, SIOCGIFADDR, &ifr);
     close(fdip);
-    strcpy(GSIP, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
+    strcpy(GSIP, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));*/
 
     for(int i = 0; i < argc - 1; i++){
         //ver o -1
@@ -74,9 +73,9 @@ int main(int argc, char *argv[]){
             quit();
             break;
         }
-        else if(strcmp(token_list[0], "rev") == 0){
+        /*else if(strcmp(token_list[0], "rev") == 0){
             rev();
-        }
+        }*/
         else{
             printf("This command doesn't exist.\n");
         }
@@ -135,11 +134,11 @@ void quit(){
     communication_udp(send);
 }
 
-void rev(){
+/*void rev(){
     char send[INPUT_SIZE];
     sprintf(send, "REV %s\n", id);
     communication_udp(send);
-}
+}*/
 
 void communication_udp(char *send){
     char buffer[BUFFER_SIZE];
@@ -203,7 +202,7 @@ void communication_tcp(char *send){
 }
 
 void received_udp(char *received){
-    char *token_list[35];
+    char *token_list[40];
     char *tok = strtok(received, " \n");
     for (int i = 0; tok != NULL && i < INPUT_SIZE; i++){
         token_list[i] = tok;
@@ -286,9 +285,9 @@ void received_udp(char *received){
             printf("RQT ERR\n");
         }
     }
-    else if(strcmp(token_list[0], "RRV") == 0){
-        printf("%s", token_list[1]);
-    }
+    /*else if(strcmp(token_list[0], "RRV") == 0){
+        printf("%s\n", token_list[1]);
+    }*/
 }
 
 void received_tcp(char *received){
