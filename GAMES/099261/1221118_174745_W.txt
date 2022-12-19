@@ -1,3 +1,0 @@
-helicoidal Helix.svg
-T p
-T o

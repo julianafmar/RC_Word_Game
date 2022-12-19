@@ -16,13 +16,16 @@
 
 #define TRUE 1
 #define FALSE 0
+
 #define DEFAULT_GSport "58033"
 #define PORT_SIZE 16
 #define MAX_LINES 25
 #define FILE_SIZE 30
 #define WORD_SIZE 100
 #define FNAME_SIZE 24
-#define SEND_SIZE 128
+#define SEND_SIZE 129
+#define COMMAND_SIZE 4
+#define PLID_SIZE 7
 
 int verbose = FALSE;
 int udp_fd, tcp_fd, newfd, errcode;
@@ -32,7 +35,7 @@ struct addrinfo udp_hints, tcp_hints, *udp_res, *tcp_res;
 struct sockaddr_in addr;
 
 void verbosePrint(char plid[], char command[]);
-int start(char plid[], char word_file[], char buffer[]);
+int start(char plid[], char word_file[], char buffer[], int line_number);
 int play(char plid[], char letter, int trial);
 int guess(char plid[], char guess_word[], int trial);
 void quit(char plid[]);
@@ -51,12 +54,12 @@ int FindLastGame(char plid[], char *fname);
 
 int main(int argc, char *argv[]){
     pid_t pid;
-    int n_trials = 0;
-    char command[4];
-    char plid[7];
+    int n_trials = 0, line_number = 0;
+    char command[COMMAND_SIZE];
+    char plid[PLID_SIZE];
     char word_file[FILE_SIZE];
     char GSport[PORT_SIZE];
-    char buffer[129];
+    char buffer[SEND_SIZE];
     strcpy(GSport, DEFAULT_GSport);
     strcpy(word_file, argv[1]);
 
@@ -101,7 +104,7 @@ int main(int argc, char *argv[]){
             addrlen = sizeof(addr);
             n = recvfrom(udp_fd, buffer, 128, 0, (struct sockaddr*) &addr, &addrlen);
             if(n == -1) exit(1);
-            buffer[129] = '\0';
+            buffer[SEND_SIZE] = '\0';
 
             char *ptr = buffer;
             sscanf(ptr, "%s", command);
@@ -109,7 +112,8 @@ int main(int argc, char *argv[]){
 
             if(strcmp(command, "SNG") == 0){
                 sscanf(ptr, "%s", plid);
-                start(plid, word_file, buffer);
+                start(plid, word_file, buffer, line_number);
+                line_number++;
             }
 
             if(strcmp(command, "PLG") == 0){
@@ -157,6 +161,12 @@ int main(int argc, char *argv[]){
 
             if(strcmp(command, "GSB") == 0){
                 scoreboard(pid);
+                struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&addr;
+                struct in_addr ipAddr = pV4Addr->sin_addr;
+
+                char str[INET_ADDRSTRLEN];
+                inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
+                printf("%s %s %d\n", command, inet_ntoa(addr.sin_addr), (int) ntohs(addr.sin_port));
             }
             if(strcmp(command, "GHL") == 0){
                 ptr += strlen(command)+1;
@@ -200,7 +210,7 @@ void tcpSendFile(FILE *fp){
     }
 }
 
-int start(char plid[], char word_file[], char buffer[]){
+int start(char plid[], char word_file[], char buffer[], int line_number){
     char game_file[FILE_SIZE];
     int word_len;
     char word[30];
@@ -242,7 +252,15 @@ int start(char plid[], char word_file[], char buffer[]){
         FILE *fp = fopen(word_file, "r");
         if(fp == NULL) exit(1);
 
-        time_t t;
+        char line[50];
+        for(int i = 0; fgets(line, sizeof(line), fp) != NULL && i <= MAX_LINES; i++){
+            if((i % MAX_LINES) == line_number){
+                sscanf(line, "%s", word);
+                break;
+            }
+        }
+        
+        /*time_t t;
         srand((unsigned) time(&t));
 
         int line_number = rand() % MAX_LINES;        
@@ -251,7 +269,7 @@ int start(char plid[], char word_file[], char buffer[]){
                 sscanf(line, "%s", word);
                 break;
             }
-        }
+        }*/
         fclose(fp);
 
         word_len = strlen(word);
@@ -830,7 +848,7 @@ void changeGameDir(char filename[], char plid[], char code){
     stat(filename, &attr);
     t = gmtime(&attr.st_mtime);
 
-    sprintf(new_filename, "GAMES/%s/%d%d%d_%d%d%d_%c.txt", plid, t->tm_year, t->tm_mon, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, code);
+    sprintf(new_filename, "GAMES/%s/%04d%02d%02d_%02d%02d%02d_%c.txt", plid, t->tm_year+1900, t->tm_mon+1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, code);
     int m = rename(filename, new_filename);
 }
 
@@ -843,8 +861,8 @@ void scoreCreate(int n_succ, int n_wrong, char plid[], char filename[], char wor
     stat(filename, &attr);
     t = gmtime(&attr.st_mtime);
 
-    char scorefile[30];
-    sprintf(scorefile, "SCORES/%03d_%s_%d%d%d_%d%d%d.txt", score, plid, t->tm_year, t->tm_mon, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
+    char scorefile[40];
+    sprintf(scorefile, "SCORES/%03d_%s_%04d%02d%02d_%02d%02d%02d.txt", score, plid, t->tm_year+1900, t->tm_mon+1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
 
     FILE *fp = fopen(scorefile, "w");
     if(fp == NULL) exit(1);
@@ -864,29 +882,3 @@ void verbosePrint(char plid[], char command[]){
     inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
     printf("%s %s %s %d\n", plid, command, inet_ntoa(addr.sin_addr), (int) ntohs(addr.sin_port));
 }
-
-/*int FindLastGame(char plid[], char *fname){
-    struct dirent **player_games;
-    int n_entries, found;
-    char dirname[20];
-
-    sprintf(dirname, "GAMES/%s/", plid);
-    n_entries =  scandir(dirname, &player_games, 0, alphasort);
-    found = 0;
-
-    if(n_entries <= 0){
-        return 0;
-    }
-    else{
-        while(n_entries--){
-            if(player_games[n_entries]->d_name[0] != '.'){
-                sprintf(fname, "GAMES/%s/%s", plid, player_games[n_entries]->d_name);
-                found = 1;
-            }
-            free(player_games[n_entries]);
-            if(found) break;
-        }
-        free(player_games);
-    }
-    return found;
-}*/
