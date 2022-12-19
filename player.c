@@ -210,7 +210,6 @@ void received_udp(char *received){
     }
     if(strcmp(token_list[0], "RSG") == 0){
         if(strcmp(token_list[1], "NOK") == 0){
-            n_trials--; // da errado na mesma
             printf("You already have an ongoing game.\n");
         }
         else if(strcmp(token_list[1], "OK") == 0){
@@ -277,9 +276,10 @@ void received_udp(char *received){
     else if(strcmp(token_list[0], "RQT") == 0){
         if(strcmp(token_list[1], "OK") == 0){
             printf("Goodbye!\n");
+            n_trials = 0;
         }
         else if(strcmp(token_list[1], "NOK") == 0){
-            printf("You don't have an ongoing game\n");
+            printf("You don't have an ongoing game.\n");
         }
         else if(strcmp(token_list[1], "ERR") == 0){
             printf("RQT ERR\n");

@@ -184,7 +184,10 @@ int main(int argc, char *argv[]){
                 }
                 state(plid);
             }
+            close(newfd);
         }
+        freeaddrinfo(tcp_res);
+        close(tcp_fd);
     }
 }
 
@@ -592,8 +595,7 @@ void quit(char plid[]){
         udpSendToClient("RQT ERR\n");
     }
     else{
-        freeaddrinfo(tcp_res);
-        close(tcp_fd);
+        changeGameDir(game_file, plid, 'Q');
         udpSendToClient("RQT OK\n");
     }
 }
@@ -880,5 +882,12 @@ void verbosePrint(char plid[], char command[]){
 
     char str[INET_ADDRSTRLEN];
     inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
-    printf("%s %s %s %d\n", plid, command, inet_ntoa(addr.sin_addr), (int) ntohs(addr.sin_port));
+
+    printf("\nPlayer ID: %s\nCommand: %s\nIP: %s\nPort: %d\n\n", plid, command, inet_ntoa(addr.sin_addr), (int) ntohs(addr.sin_port));
+
+    //versao do professor
+    char host[NI_MAXHOST],service[NI_MAXSERV];
+    if((errcode=getnameinfo((struct sockaddr *)&addr,addrlen,host,sizeof(host),service,sizeof service,0))!=0) fprintf(stderr,"error: getnameinfo: %s\n",gai_strerror(errcode));
+    else
+        printf("sent by [%s:%s]\n",host,service);
 }

@@ -1,0 +1,4 @@
+decarbonization PV_Panel.jpg
+T p
+T a
+T e
