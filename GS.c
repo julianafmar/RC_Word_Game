@@ -35,12 +35,12 @@ struct addrinfo udp_hints, tcp_hints, *udp_res, *tcp_res;
 struct sockaddr_in addr;
 
 void verbosePrint(char plid[], char command[]);
-int start(char plid[], char word_file[], char buffer[], int line_number);
-int play(char plid[], char letter, int trial);
-int guess(char plid[], char guess_word[], int trial);
+void start(char plid[], char word_file[], char buffer[], int line_number);
+void play(char plid[], char letter, int trial);
+void guess(char plid[], char guess_word[], int trial);
 void quit(char plid[]);
 //void rev(char plid[]);
-int scoreboard(int pid);
+void scoreboard(int pid);
 void hint(char plid[]);
 void state(char plid[]);
 int getMaxErrors(int word_len);
@@ -161,19 +161,12 @@ int main(int argc, char *argv[]){
 
             if(strcmp(command, "GSB") == 0){
                 scoreboard(pid);
-                struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&addr;
-                struct in_addr ipAddr = pV4Addr->sin_addr;
-
-                char str[INET_ADDRSTRLEN];
-                inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
-                printf("%s %s %d\n", command, inet_ntoa(addr.sin_addr), (int) ntohs(addr.sin_port));
+                if(verbose) verbosePrint("sb", command);
             }
             if(strcmp(command, "GHL") == 0){
                 ptr += strlen(command)+1;
                 sscanf(ptr, "%s", plid);
-                if(verbose){
-                    verbosePrint(plid, command);
-                }
+                if(verbose) verbosePrint(plid, command);
                 hint(plid);
             }
             if(strcmp(command, "STA") == 0){
@@ -213,7 +206,7 @@ void tcpSendFile(FILE *fp){
     }
 }
 
-int start(char plid[], char word_file[], char buffer[], int line_number){
+void start(char plid[], char word_file[], char buffer[], int line_number){
     char game_file[FILE_SIZE];
     int word_len;
     char word[30];
@@ -223,7 +216,7 @@ int start(char plid[], char word_file[], char buffer[], int line_number){
 
     if((strlen(plid) != 6) || (strlen(buffer) != 11)){
         udpSendToClient("RSG ERR\n");
-        return 0;
+        return;
     } 
 
     sprintf(game_file, "GAME_%s.txt", plid);
@@ -249,7 +242,7 @@ int start(char plid[], char word_file[], char buffer[], int line_number){
             udpSendToClient(send);
         }
         fclose(fp);
-        return 0;
+        return;
     }
     else{
         FILE *fp = fopen(word_file, "r");
@@ -285,11 +278,11 @@ int start(char plid[], char word_file[], char buffer[], int line_number){
         sprintf(send, "RSG OK %d %d\n", word_len, max_errors);
         n = strlen(send);
         udpSendToClient(send);
-        return 0;
+        return;
     }
 }
 
-int play(char plid[], char letter, int trial){
+void play(char plid[], char letter, int trial){
     char game_file[FILE_SIZE];
     char send[80];
     char code[2];
@@ -298,13 +291,21 @@ int play(char plid[], char letter, int trial){
     int wrong_trials = 0;
     char word[WORD_SIZE];
 
-    sprintf(game_file, "GAME_%s.txt", plid);
+    #include <ctype.h>
+    if((strlen(plid) != 6) || (isalpha(letter) == 0)){
+        sprintf(send, "RLG ERR %d\n", trial);
+        n = strlen(send);
+        udpSendToClient(send);
+        return;
+    }
     
+    sprintf(game_file, "GAME_%s.txt", plid);
+
     if(access(game_file, F_OK) != 0){
         sprintf(send, "RLG ERR %d\n", trial);
         n = strlen(send);
         udpSendToClient(send);
-        return 0;
+        return;
     }
     
     FILE *fp = fopen(game_file, "rw");
@@ -324,7 +325,7 @@ int play(char plid[], char letter, int trial){
                     n = strlen(send);
                     udpSendToClient(send);
                     fclose(fp);
-                    return 0;
+                    return;
                 }
             }
         }
@@ -358,7 +359,7 @@ int play(char plid[], char letter, int trial){
         n = strlen(send);
         udpSendToClient(send);
         fclose(fp);
-        return 0;
+        return;
     }
     if(strchr(word, letter) != NULL){
         int new_pos = 0;
@@ -386,7 +387,7 @@ int play(char plid[], char letter, int trial){
             n = strlen(send);
             udpSendToClient(send);
             fclose(fp);
-            return 0;
+            return;
         }
         else{
             char write[WORD_SIZE];
@@ -396,7 +397,7 @@ int play(char plid[], char letter, int trial){
             n = strlen(send);
             udpSendToClient(send);
             fclose(fp);
-            return 0;
+            return;
         }
     }
     else if(getMaxErrors(strlen(word)) <= (wrong_trials+1)){
@@ -408,7 +409,7 @@ int play(char plid[], char letter, int trial){
         n = strlen(send);
         udpSendToClient(send);
         fclose(fp);
-        return 0;
+        return;
     }
     else if(getMaxErrors(strlen(word)) > wrong_trials++){
         char write[WORD_SIZE];
@@ -418,11 +419,11 @@ int play(char plid[], char letter, int trial){
         n = strlen(send);
         udpSendToClient(send);
         fclose(fp);
-        return 0;
+        return;
     }
 
     fclose(fp);
-    return 0;
+    return;
 }
 
 /*void rev(char plid[]){
@@ -437,7 +438,7 @@ int play(char plid[], char letter, int trial){
     fclose(fp);
 }*/
 
-int scoreboard(int pid){
+void scoreboard(int pid){
     char send[129];
 
     struct dirent **player_score;
@@ -449,7 +450,7 @@ int scoreboard(int pid){
         sprintf(send, "RSB EMPTY\n");
         n = strlen(send);
         tcpSendToClient(send, strlen(send));
-        return 0;
+        return;
     }
 
     int total = 83 + 82 + (m-2) * 75;
@@ -495,19 +496,24 @@ int scoreboard(int pid){
     }
     free(player_score);
 
-    return 0;
+    return;
 }
 
-int guess(char plid[], char guess_word[], int trial){
+void guess(char plid[], char guess_word[], int trial){
     char game_file[FILE_SIZE], send[80], code[2];
     char play_wl[WORD_SIZE], word[WORD_SIZE], write[WORD_SIZE];
     int n_succ = 0, n_wrong = 0;
+    
+    if(strlen(plid) != 6 || strlen(guess_word) < 3){
+        udpSendToClient("RWG ERR\n");
+        return;
+    }
 
     sprintf(game_file, "GAME_%s.txt", plid);
     
     if(access(game_file, F_OK) != 0){
         udpSendToClient("RWG ERR\n");
-        return 0;
+        return;
     }
     
     FILE *fp = fopen(game_file, "rw");
@@ -538,7 +544,7 @@ int guess(char plid[], char guess_word[], int trial){
                 sprintf(send, "RWG DUP %d\n", trial);
                 udpSendToClient(send);
                 fclose(fp);
-                return 0;
+                return;
             }
             else{
                 n_wrong++;
@@ -576,7 +582,7 @@ int guess(char plid[], char guess_word[], int trial){
     }
     udpSendToClient(send);
     fclose(fp);
-    return 0;
+    return;
 }
 
 void quit(char plid[]){
@@ -648,7 +654,7 @@ void hint(char plid[]){
 }
 
 void state(char plid[]){
-    char game_file[FILE_SIZE], send[305], line[50], word[30], hint_file[24], path[30], Fname[285];
+    char game_file[FILE_SIZE], send[305], line[50], word[30], hint_file[24], path[30], Fname[285], state_file[17];
     FILE *fp;
 
     sprintf(game_file, "GAME_%s.txt", plid);
@@ -688,10 +694,10 @@ void state(char plid[]){
             int size = 38 + 6 + strlen(word) + 13 + strlen(hint_file) + 20 + (16 * count_letters) + (13 * count_words) + word_size + 18;
             int transactions = count_letters + count_words;
 
-            sprintf(Fname, "STATE_%s.txt", plid);
-            Fname[17] = '\0';
+            sprintf(state_file, "STATE_%s.txt", plid);
+            state_file[17] = '\0';
             
-            sprintf(send, "RST FIN %s %d", Fname, size);
+            sprintf(send, "RST FIN %s %d", state_file, size);
             tcpSendToClient(send, strlen(send));
             
             sprintf(send, "Last finalized game for player %s\n", plid);
@@ -727,8 +733,13 @@ void state(char plid[]){
                 send[18] = '\0';
                 tcpSendToClient(send, strlen(send));
             }
-            else{
+            else if(strstr(Fname, "F") != NULL){
                 sprintf(send, "Termination: FAIL\n");
+                send[19] = '\0';
+                tcpSendToClient(send, strlen(send));
+            }
+            else{
+                sprintf(send, "Termination: QUIT\n");
                 send[19] = '\0';
                 tcpSendToClient(send, strlen(send));
             }
@@ -877,17 +888,20 @@ void scoreCreate(int n_succ, int n_wrong, char plid[], char filename[], char wor
 }
 
 void verbosePrint(char plid[], char command[]){
-    struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&addr;
+    /*struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&addr;
     struct in_addr ipAddr = pV4Addr->sin_addr;
 
     char str[INET_ADDRSTRLEN];
     inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
 
-    printf("\nPlayer ID: %s\nCommand: %s\nIP: %s\nPort: %d\n\n", plid, command, inet_ntoa(addr.sin_addr), (int) ntohs(addr.sin_port));
+    printf("\nPlayer ID: %s\nCommand: %s\nIP: %s\nPort: %d\n\n", plid, command, inet_ntoa(addr.sin_addr), (int) ntohs(addr.sin_port));*/
 
     //versao do professor
     char host[NI_MAXHOST],service[NI_MAXSERV];
-    if((errcode=getnameinfo((struct sockaddr *)&addr,addrlen,host,sizeof(host),service,sizeof service,0))!=0) fprintf(stderr,"error: getnameinfo: %s\n",gai_strerror(errcode));
-    else
-        printf("sent by [%s:%s]\n",host,service);
+    if((errcode = getnameinfo((struct sockaddr *)&addr, addrlen, host, sizeof(host), service, sizeof(service), 0)) != 0) fprintf(stderr,"error: getnameinfo: %s\n", gai_strerror(errcode));
+    else{
+        if(strcmp("sb", plid) != 0) printf("\n\nCommand: %s\nIP: %s\nPort: %s\n", command, host, service);
+        else printf("\n\nPlayer ID: %s\nCommand: %s\nIP: %s\nPort: %s\n", plid, command, host, service);
+    } 
+
 }

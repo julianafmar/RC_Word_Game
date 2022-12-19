@@ -3,6 +3,35 @@
 int main(int argc, char *argv[]){
     strcpy(GSport, DEFAULT_GSport);
 
+    /* versao 3
+    struct addrinfo hints,*res,*p;
+    int errcode;
+    char buffer[INET_ADDRSTRLEN];
+    struct in_addr *addr;
+    memset(&hints,0,sizeof hints);
+    hints.ai_family=AF_INET;//IPv4
+    hints.ai_socktype=SOCK_STREAM;
+    hints.ai_flags=AI_CANONNAME;
+
+    char hostbuffer[256];
+    int hostname;
+    hostname = gethostname(hostbuffer, sizeof(hostbuffer));
+    if(hostname == -1) perror("gethostname");
+
+    if((errcode=getaddrinfo(hostbuffer,NULL,&hints,&res))!=0)
+        fprintf(stderr,"error: getaddrinfo: %s\n",gai_strerror(errcode));
+    else{
+        printf("canonical hostname: %s\n",res->ai_canonname);
+        for(p=res;p!=NULL;p=p->ai_next){
+            addr=&((struct sockaddr_in *)p->ai_addr)->sin_addr;
+            printf("internet address: %s (%08lX)\n",
+            inet_ntop(p->ai_family,addr,buffer,sizeof buffer),(long unsigned int)ntohl(addr->s_addr));
+        }
+        freeaddrinfo(res);
+    }*/
+    
+
+    //versao 1
     char hostbuffer[256];
     char *IPbuffer;
     struct hostent *host_entry;
@@ -15,7 +44,8 @@ int main(int argc, char *argv[]){
     if(IPbuffer == NULL) perror("inet_ntoa");
     strcpy(GSIP, IPbuffer);
 
-    /*int fdip;
+    /* versao 2
+    int fdip;
     struct ifreq ifr;
 
     fdip = socket(AF_INET, SOCK_DGRAM, 0);
@@ -26,7 +56,6 @@ int main(int argc, char *argv[]){
     strcpy(GSIP, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));*/
 
     for(int i = 0; i < argc - 1; i++){
-        //ver o -1
         if(strcmp(argv[i], "-p") == 0){
             strcpy(GSport, argv[i+1]);
         }
@@ -387,6 +416,8 @@ void received_tcp(char *received){
             sscanf(received, "%s", Fsize);
             received += strlen(Fsize) + 1;
 
+            printf("The filename is %s and its size is %s. File's content is:\n", Fname, Fsize);
+            
             FILE *fp = fopen(Fname, "w");
             if(fp == NULL) exit(1);
 
@@ -402,8 +433,6 @@ void received_tcp(char *received){
                 size -= n;
             }
             fclose(fp);
-
-            printf("The filename is %s and its size is %s. File's content is:\n", Fname, Fsize);
 
             fp = fopen(Fname, "r");
             if(fp == NULL) exit(1);
