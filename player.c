@@ -451,6 +451,9 @@ void received_tcp(char *received){
             sscanf(received, "%s", Fsize);
             received += strlen(Fsize) + 1;
 
+            printf("Fname is %s and Fsize is %s.\n", Fname, Fsize);
+            printf("The filename is %s and its size is %s. File's content is:\n", Fname, Fsize);
+
             FILE *fp = fopen(Fname, "w");
             if(fp == NULL) exit(1);
 
@@ -466,8 +469,6 @@ void received_tcp(char *received){
                 size -= n;
             }
             fclose(fp);
-
-            printf("The filename is %s and its size is %s. File's content is:\n", Fname, Fsize);
 
             fp = fopen(Fname, "r");
             if(fp == NULL) exit(1);

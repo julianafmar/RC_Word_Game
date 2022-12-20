@@ -101,36 +101,37 @@ int main(int argc, char *argv[]){
         //UDP
         while(1){
             memset(buffer, 0, strlen(buffer));
+            memset(command, 0, strlen(command));
             addrlen = sizeof(addr);
             n = recvfrom(udp_fd, buffer, 128, 0, (struct sockaddr*) &addr, &addrlen);
             if(n == -1) exit(1);
             buffer[SEND_SIZE] = '\0';
 
             char *ptr = buffer;
-            sscanf(ptr, "%s", command);
+            sscanf(buffer, "%s", command);
             ptr += strlen(command) + 1;
-
+            
             if(strcmp(command, "SNG") == 0){
                 sscanf(ptr, "%s", plid);
                 start(plid, word_file, buffer, line_number);
                 line_number++;
             }
 
-            if(strcmp(command, "PLG") == 0){
+            else if(strcmp(command, "PLG") == 0){
                 char letter, c_trial[2];
                 sscanf(ptr, "%s %c %s", plid, &letter, c_trial);
                 int trial = atoi(c_trial);
                 play(plid, letter, trial);
             }
 
-            if(strcmp(command, "PWG") == 0){
+            else if(strcmp(command, "PWG") == 0){
                 char letter, c_trial[2], guess_word[WORD_SIZE];
                 sscanf(ptr, "%s %s %s", plid, guess_word, c_trial);
                 int trial = atoi(c_trial);
                 guess(plid, guess_word, trial);
             }
 
-            if(strcmp(command, "QUT") == 0){
+            else if(strcmp(command, "QUT") == 0){
                 sscanf(ptr, "%s", plid);
                 quit(plid);
             }
@@ -150,6 +151,7 @@ int main(int argc, char *argv[]){
         //TCP
         while(1){
             memset(buffer, 0, strlen(buffer));
+            memset(command, 0, strlen(command));
             addrlen = sizeof(addr);
             newfd = accept(tcp_fd, (struct sockaddr*) &addr, &addrlen);
             if(newfd == -1) exit(1);
@@ -503,14 +505,12 @@ void guess(char plid[], char guess_word[], int trial){
     char game_file[FILE_SIZE], send[80], code[2];
     char play_wl[WORD_SIZE], word[WORD_SIZE], write[WORD_SIZE];
     int n_succ = 0, n_wrong = 0;
-    
     if(strlen(plid) != 6 || strlen(guess_word) < 3){
         udpSendToClient("RWG ERR\n");
         return;
     }
 
     sprintf(game_file, "GAME_%s.txt", plid);
-    
     if(access(game_file, F_OK) != 0){
         udpSendToClient("RWG ERR\n");
         return;
@@ -518,10 +518,21 @@ void guess(char plid[], char guess_word[], int trial){
     
     FILE *fp = fopen(game_file, "rw");
     if(fp == NULL) exit(1);
-    
     char line[50];
     fgets(line, sizeof(line), fp);
     sscanf(line, "%s", word);
+
+    if(strcmp(word, guess_word) == 0){
+        sprintf(send, "RWG WIN %d\n", trial);
+
+        sprintf(write, "G %s\n", guess_word);
+        fileWrite(game_file, write, "a");
+
+        changeGameDir(game_file, plid, 'W');
+        scoreCreate(n_succ, n_wrong, plid, game_file, word);
+        udpSendToClient(send);
+        return;
+    }
 
     int i = 1;
     int dup = 0, dup_trial = 0;
@@ -557,21 +568,10 @@ void guess(char plid[], char guess_word[], int trial){
         fclose(fp);
         return;
     }
-
     if(i != trial){
         udpSendToClient("RWG INV\n");
         fclose(fp);
         return;
-    }
-    if(strcmp(word, guess_word) == 0){
-        sprintf(send, "RWG WIN %d\n", trial);
-
-        sprintf(write, "G %s\n", guess_word);
-        fileWrite(game_file, write, "a");
-
-        changeGameDir(game_file, plid, 'W');
-
-        scoreCreate(n_succ, n_wrong, plid, game_file, word);
     }
     else{
         if(trial >= getMaxErrors(strlen(word))){
@@ -721,7 +721,7 @@ void state(char plid[]){
             sprintf(state_file, "STATE_%s.txt", plid);
             state_file[17] = '\0';
             
-            sprintf(send, "RST FIN %s %d", state_file, size);
+            sprintf(send, "RST FIN %s %d\n", state_file, size);
             tcpSendToClient(send, strlen(send));
             
             sprintf(send, "Last finalized game for player %s\n", plid);
@@ -799,7 +799,7 @@ void state(char plid[]){
         }
         int transactions = i-1;
 
-        int size = 36 + 20 + 23*(n_trues+n_falses) + count_words*transactions + transactions + word_size + 15 + strlen(word);
+        int size = 36 + 22 + 23*(n_trues+n_falses) + count_words*transactions + transactions + word_size + 15 + strlen(word);
         //int size = 30 + 6 + 22 + 13 + 23*n_trues + 24*n_falses + (21 * count_words) + word_size + 16 + strlen(word);
 
         sprintf(Fname, "STATE_%s.txt", plid);
@@ -808,7 +808,7 @@ void state(char plid[]){
         sprintf(send, "RST ACT %s %d\n", Fname, size);
         tcpSendToClient(send, strlen(send));
 
-        sprintf(send, "Active game found for player %s\n", plid);
+        sprintf(send, "\nActive game found for player %s\n", plid);
         tcpSendToClient(send, strlen(send));
 
         sprintf(send, "Transactions found: %d\n", transactions);
@@ -818,33 +818,36 @@ void state(char plid[]){
         char word_so_far[WORD_SIZE];
         memset(word_so_far, '_', strlen(word));
 
-        fgets(line, sizeof(line), fp);
-        sscanf(line, "%s", word);
-        for(i = 0; fgets(line, sizeof(line), fp) != NULL; i++){
-            sscanf(line, "%c %s", &code, wl);
-            if (code == 'T'){
-                if(strstr(word, wl)){
-                    sprintf(send, "Letter trial: %s - TRUE\n", wl);
-                    tcpSendToClient(send, strlen(send));
-                    for(int j = 0; j < strlen(word); j++){
-                        char *let = wl;
-                        if(word[j] == *let){
-                            word_so_far[j] = *let;
+        if(transactions > 0){
+            fgets(line, sizeof(line), fp);
+            sscanf(line, "%s", word);
+            for(i = 0; fgets(line, sizeof(line), fp) != NULL; i++){
+                sscanf(line, "%c %s", &code, wl);
+                if (code == 'T'){
+                    if(strstr(word, wl)){
+                        sprintf(send, "Letter trial: %s - TRUE\n", wl);
+                        tcpSendToClient(send, strlen(send));
+                        for(int j = 0; j < strlen(word); j++){
+                            char *let = wl;
+                            if(word[j] == *let){
+                                word_so_far[j] = *let;
+                            }
                         }
                     }
+                    else{
+                        sprintf(send, "Letter trial: %s - FALSE\n", wl);
+                        tcpSendToClient(send, strlen(send));
+                    }
                 }
-                else{
-                    sprintf(send, "Letter trial: %s - FALSE\n", wl);
+                else if(code == 'G'){
+                    sprintf(send, "Word guess: %s - FALSE\n", wl);
                     tcpSendToClient(send, strlen(send));
                 }
             }
-            else if(code == 'G'){
-                sprintf(send, "Word guess: %s - FALSE\n", wl);
-                tcpSendToClient(send, strlen(send));
-            }
         }
+        
         word_so_far[strlen(word)] = '\0';
-        sprintf(send, "Solved so far: %s\n", word_so_far);
+        sprintf(send, "Solved so far: %s\n\n", word_so_far);
         send[17+strlen(word_so_far)] = '\0';
         tcpSendToClient(send, strlen(send));
     }
