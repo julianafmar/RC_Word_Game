@@ -3,35 +3,6 @@
 int main(int argc, char *argv[]){
     strcpy(GSport, DEFAULT_GSport);
 
-    /* versao 3
-    struct addrinfo hints,*res,*p;
-    int errcode;
-    char buffer[INET_ADDRSTRLEN];
-    struct in_addr *addr;
-    memset(&hints,0,sizeof hints);
-    hints.ai_family=AF_INET;//IPv4
-    hints.ai_socktype=SOCK_STREAM;
-    hints.ai_flags=AI_CANONNAME;
-
-    char hostbuffer[256];
-    int hostname;
-    hostname = gethostname(hostbuffer, sizeof(hostbuffer));
-    if(hostname == -1) perror("gethostname");
-
-    if((errcode=getaddrinfo(hostbuffer,NULL,&hints,&res))!=0)
-        fprintf(stderr,"error: getaddrinfo: %s\n",gai_strerror(errcode));
-    else{
-        printf("canonical hostname: %s\n",res->ai_canonname);
-        for(p=res;p!=NULL;p=p->ai_next){
-            addr=&((struct sockaddr_in *)p->ai_addr)->sin_addr;
-            printf("internet address: %s (%08lX)\n",
-            inet_ntop(p->ai_family,addr,buffer,sizeof buffer),(long unsigned int)ntohl(addr->s_addr));
-        }
-        freeaddrinfo(res);
-    }*/
-    
-
-    //versao 1
     char hostbuffer[256];
     char *IPbuffer;
     struct hostent *host_entry;
@@ -43,17 +14,6 @@ int main(int argc, char *argv[]){
     IPbuffer = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
     if(IPbuffer == NULL) perror("inet_ntoa");
     strcpy(GSIP, IPbuffer);
-
-    /* versao 2
-    int fdip;
-    struct ifreq ifr;
-
-    fdip = socket(AF_INET, SOCK_DGRAM, 0);
-    ifr.ifr_addr.sa_family = AF_INET;
-    strncpy(ifr.ifr_name, "eth0", IFNAMSIZ-1);
-    ioctl(fdip, SIOCGIFADDR, &ifr);
-    close(fdip);
-    strcpy(GSIP, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));*/
 
     for(int i = 0; i < argc - 1; i++){
         if(strcmp(argv[i], "-p") == 0){
@@ -102,9 +62,9 @@ int main(int argc, char *argv[]){
             quit();
             break;
         }
-        /*else if(strcmp(token_list[0], "rev") == 0){
+        else if(strcmp(token_list[0], "rev") == 0){
             rev();
-        }*/
+        }
         else{
             printf("This command doesn't exist.\n");
         }
@@ -117,10 +77,7 @@ int main(int argc, char *argv[]){
 
 void start(char plid[]){
     char send[INPUT_SIZE];
-    n_trials++;
-    if((strcmp(plid, id) != 0) && (strlen(id) != 0)){
-        n_trials = 1;
-    }
+    n_trials = 1;
     strcpy(id, plid);
     sprintf(send, "SNG %s\n", plid);
     communication_udp(send);
@@ -163,11 +120,11 @@ void quit(){
     communication_udp(send);
 }
 
-/*void rev(){
+void rev(){
     char send[INPUT_SIZE];
     sprintf(send, "REV %s\n", id);
     communication_udp(send);
-}*/
+}
 
 void communication_udp(char *send){
     char buffer[BUFFER_SIZE];
@@ -231,92 +188,103 @@ void communication_tcp(char *send){
 }
 
 void received_udp(char *received){
-    char *token_list[40];
-    char *tok = strtok(received, " \n");
-    for (int i = 0; tok != NULL && i < INPUT_SIZE; i++){
-        token_list[i] = tok;
-        tok = strtok(NULL, " \n");
-    }
-    if(strcmp(token_list[0], "RSG") == 0){
-        if(strcmp(token_list[1], "NOK") == 0){
+    char command[4], status[4];
+    sscanf(received, "%s", command);
+    received = received + strlen(command) + 1;
+
+    if(strcmp(command, "RSG") == 0){
+        sscanf(received, "%s", status);
+        received = received + strlen(status) + 1;
+        if(strcmp(status, "NOK") == 0){
             printf("You already have an ongoing game.\n");
         }
-        else if(strcmp(token_list[1], "OK") == 0){
-            max_errors = atoi(token_list[3]);
-            n_letters = atoi(token_list[2]);
+        else if(strcmp(status, "OK") == 0){
+            sscanf(received, "%d %d", &n_letters, &max_errors);
             memset(word_spaces, *UNDERSCORE, n_letters);
-            printf("New game started. Guess %s letter word (max %s errors): %s\n", token_list[2], token_list[3], word_spaces);
+            printf("New game started. Guess %d letter word (max %d errors): %s\n", n_letters, max_errors, word_spaces);
         }
-        else if(strcmp(token_list[1], "ERR") == 0){
+        else if(strcmp(status, "ERR") == 0){
             printf("RSG ERR\n");
         }
     }
-    else if(strcmp(token_list[0], "RLG") == 0){
-        if(strcmp(token_list[1], "OK") == 0){
+    else if(strcmp(command, "RLG") == 0){
+        sscanf(received, "%s", status);
+        received = received + strlen(status) + 1;
+        if(strcmp(status, "OK") == 0){
             n_trials++;
-            int n = atoi(token_list[3]);
+            char n_str[3], trial[3];
+            sscanf(received, "%s %s", trial, n_str);
+            received = received + strlen(trial) + strlen(n_str) + 2;
+
+            int n = atoi(n_str);
             for(int i = 0; i < n; i++){
-                word_spaces[atoi(token_list[4+i])-1] = letter_try;
+                sscanf(received, "%s", n_str);
+                received = received + strlen(n_str) + 1;
+                word_spaces[atoi(n_str)-1] = letter_try;
             }
             printf("Word: %s\n", word_spaces);
         }
-        else if(strcmp(token_list[1], "WIN") == 0){
+        else if(strcmp(status, "WIN") == 0){
             printf("You won!\n");
         }
-        else if(strcmp(token_list[1], "DUP") == 0){
+        else if(strcmp(status, "DUP") == 0){
             printf("You already tried this letter.\n");
         }
-        else if(strcmp(token_list[1], "NOK") == 0){
+        else if(strcmp(status, "NOK") == 0){
             n_trials++;
             printf("Ups! This letter is not part of the word.\n");
         }
-        else if(strcmp(token_list[1], "OVR") == 0){
+        else if(strcmp(status, "OVR") == 0){
             n_trials++;
             printf("Game over.\n");
         }
-        else if(strcmp(token_list[1], "INV") == 0){
+        else if(strcmp(status, "INV") == 0){
             printf("The trial number is invalid.\n");
         }
-        else if(strcmp(token_list[1], "ERR") == 0){
+        else if(strcmp(status, "ERR") == 0){
             printf("RLG ERR\n");
         }
     }
-    else if(strcmp(token_list[0], "RWG") == 0){
-        if(strcmp(token_list[1], "WIN") == 0){
+    else if(strcmp(command, "RWG") == 0){
+        sscanf(received, "%s", status);
+        if(strcmp(status, "WIN") == 0){
             printf("You won!\n");
         }
-        else if(strcmp(token_list[1], "DUP") == 0){
+        else if(strcmp(status, "DUP") == 0){
             printf("You already tried this word.\n");
         }
-        else if(strcmp(token_list[1], "NOK") == 0){    
+        else if(strcmp(status, "NOK") == 0){    
             n_trials++;
             printf("That's not the right word.\n");
         }
-        else if(strcmp(token_list[1], "OVR") == 0){
+        else if(strcmp(status, "OVR") == 0){
             printf("Game over.");
         }
-        else if(strcmp(token_list[1], "INV") == 0){
+        else if(strcmp(status, "INV") == 0){
             printf("The trial number is invalid.\n");
         }
-        else if(strcmp(token_list[1], "ERR") == 0){
+        else if(strcmp(status, "ERR") == 0){
             printf("RWG ERR\n");
         }
     }
-    else if(strcmp(token_list[0], "RQT") == 0){
-        if(strcmp(token_list[1], "OK") == 0){
+    else if(strcmp(command, "RQT") == 0){
+        sscanf(received, "%s", status);
+        if(strcmp(status, "OK") == 0){
             printf("Goodbye!\n");
             n_trials = 0;
         }
-        else if(strcmp(token_list[1], "NOK") == 0){
+        else if(strcmp(status, "NOK") == 0){
             printf("You don't have an ongoing game.\n");
         }
-        else if(strcmp(token_list[1], "ERR") == 0){
+        else if(strcmp(status, "ERR") == 0){
             printf("RQT ERR\n");
         }
     }
-    /*else if(strcmp(token_list[0], "RRV") == 0){
-        printf("%s\n", token_list[1]);
-    }*/
+    else if(strcmp(command, "RRV") == 0){
+        char word[WORD_SIZE];
+        sscanf(received, "%s", word);
+        printf("%s\n", word);
+    }
 }
 
 void received_tcp(char *received){

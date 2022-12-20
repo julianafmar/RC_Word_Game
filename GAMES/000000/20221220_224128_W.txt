@@ -1,2 +1,6 @@
 abracadabra witch.jpg
-G abracadabra
+T a
+T b
+T r
+T c
+T d

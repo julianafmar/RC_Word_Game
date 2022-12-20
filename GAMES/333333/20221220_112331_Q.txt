@@ -1,7 +1,0 @@
-chlorobenzylidenemalononitrile 2D-struct.png
-T a
-T e
-T c
-T r
-T t
-T m
