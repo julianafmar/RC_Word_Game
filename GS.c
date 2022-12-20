@@ -287,8 +287,7 @@ void play(char plid[], char letter, int trial){
     char send[80];
     char code[2];
     char play_wl[WORD_SIZE];
-    int right_trials = 0;
-    int wrong_trials = 0;
+    int right_trials = 0, wrong_trials = 0, count_trials = 0;
     char word[WORD_SIZE];
 
     #include <ctype.h>
@@ -335,9 +334,10 @@ void play(char plid[], char letter, int trial){
                 for(int j = 0; j < strlen(word); j++){
                     char *let = play_wl;
                     if(word[j] == *let){
-                        right_trials++;
+                        count_trials++;
                     }
                 }
+                right_trials++;
             }
             else{
                 wrong_trials++;
@@ -375,13 +375,13 @@ void play(char plid[], char letter, int trial){
         }
         positions[strlen(positions)-1] = '\0';
 
-        int tr = right_trials + new_pos;
+        int tr = count_trials + new_pos;
         
         if(tr == strlen(word)){
             char write[WORD_SIZE];
             sprintf(write, "T %c\n", letter);
             fileWrite(game_file, write, "a");
-            scoreCreate(tr, wrong_trials, plid, game_file, word);
+            scoreCreate(right_trials, wrong_trials, plid, game_file, word);
             changeGameDir(game_file, plid, 'W');
             sprintf(send, "RLG WIN %d\n", trial);
             n = strlen(send);
@@ -393,7 +393,7 @@ void play(char plid[], char letter, int trial){
             char write[WORD_SIZE];
             sprintf(write, "T %c\n", letter);
             fileWrite(game_file, write, "a");
-            sprintf(send, "RLG OK %d %d %s\n", (right_trials+wrong_trials), new_pos, positions);
+            sprintf(send, "RLG OK %d %d %s\n", (count_trials+wrong_trials), new_pos, positions);
             n = strlen(send);
             udpSendToClient(send);
             fclose(fp);
@@ -524,16 +524,12 @@ void guess(char plid[], char guess_word[], int trial){
     sscanf(line, "%s", word);
 
     int i = 1;
+    int dup = 0, dup_trial = 0;
     for(; fgets(line, sizeof(line), fp) != NULL; i++){
         sscanf(line, "%s %s", code, play_wl);
         if(strcmp(code, "T") == 0){
             if(strstr(word, play_wl) != NULL){
-                for(int j = 0; j < strlen(word); j++){
-                    char *let = play_wl;
-                    if(word[j] == *let){
-                        n_succ++;
-                    }
-                }
+                n_succ++;
             }
             else{
                 n_wrong++;
@@ -541,19 +537,31 @@ void guess(char plid[], char guess_word[], int trial){
         }
         else if(strcmp(code, "G") == 0){
             if(strcmp(guess_word, play_wl) == 0){
-                sprintf(send, "RWG DUP %d\n", trial);
-                udpSendToClient(send);
-                fclose(fp);
-                return;
+                dup = 1;
+                dup_trial = i;
             }
             else{
                 n_wrong++;
             }
         }
     }
-    
+
+    if(dup == 1){
+        if((dup_trial + 1) == trial){
+            sprintf(send, "RWG NOK %d\n", trial);
+        }
+        else{
+            sprintf(send, "RWG DUP %d\n", trial);
+        }
+        udpSendToClient(send);
+        fclose(fp);
+        return;
+    }
+
     if(i != trial){
         udpSendToClient("RWG INV\n");
+        fclose(fp);
+        return;
     }
     if(strcmp(word, guess_word) == 0){
         sprintf(send, "RWG WIN %d\n", trial);
@@ -601,8 +609,24 @@ void quit(char plid[]){
         udpSendToClient("RQT ERR\n");
     }
     else{
-        changeGameDir(game_file, plid, 'Q');
-        udpSendToClient("RQT OK\n");
+        FILE *fp = fopen(game_file, "r");
+        if(fp == NULL) exit(1);
+
+        char line[50];
+        int i = 0;
+        for(; fgets(line, sizeof(line), fp) != NULL; i++){
+            ;
+        }
+    
+        if(i == 1){
+            udpSendToClient("RQT OK\n");
+        }
+        else{
+            changeGameDir(game_file, plid, 'Q');
+            udpSendToClient("RQT OK\n");
+        }
+        fclose(fp);
+        return;
     }
 }
 
