@@ -391,9 +391,11 @@ void received_tcp(char *received){
 
             n -= (9 + strlen(Fname) + strlen(Fsize));
             int size = atoi(Fsize);
+            if((size - n) < 0) n = size;
             size -= n;
             fwrite(received, 1, n, fp);
             while(n > 0 && size > 0){
+                memset(buffer, 0, strlen(buffer));
                 n = read(tcp_fd, buffer, 128);
                 buffer[129] = '\0';
                 fwrite(buffer, 1, n, fp);
@@ -405,9 +407,11 @@ void received_tcp(char *received){
             fp = fopen(Fname, "r");
             if(fp == NULL) exit(1);
             char c = fgetc(fp);
+            int x = 0;
             while(c != EOF){
                 printf("%c", c);
                 c = fgetc(fp);
+                x++;
             }
             fclose(fp);
         }
@@ -419,7 +423,6 @@ void received_tcp(char *received){
             sscanf(received, "%s", Fsize);
             received += strlen(Fsize) + 1;
 
-            printf("Fname is %s and Fsize is %s.\n", Fname, Fsize);
             printf("The filename is %s and its size is %s. File's content is:\n", Fname, Fsize);
 
             FILE *fp = fopen(Fname, "w");

@@ -831,7 +831,7 @@ void state(char plid[]){
         }
         int transactions = i-1;
 
-        int size = 36 + 22 + 23*(n_trues+n_falses) + count_words*transactions + transactions + word_size + 15 + strlen(word);
+        int size = 36 + 25 + 23*(n_trues+n_falses) + count_words*transactions + transactions + word_size + 15 + strlen(word);
 
         sprintf(Fname, "STATE_%s.txt", plid);
         char aux[5];
@@ -848,6 +848,7 @@ void state(char plid[]){
         fseek(fp, 0, SEEK_SET);
         char word_so_far[WORD_SIZE];
         memset(word_so_far, '_', strlen(word));
+        word_so_far[strlen(word)] = '\0';
 
         if(transactions > 0){
             fgets(line, sizeof(line), fp);
@@ -877,7 +878,6 @@ void state(char plid[]){
             }
         }
         
-        word_so_far[strlen(word)] = '\0';
         sprintf(send, "Solved so far: %s\n\n", word_so_far);
         send[17+strlen(word_so_far)] = '\0';
         tcpSendToClient(send, strlen(send));
@@ -899,7 +899,10 @@ int getMaxErrors(int word_len){
 
 void fileWrite(char file_name[], char write[], char type[]){
     FILE *fp = fopen(file_name, type);
-    if(fp == NULL) exit(1);
+    if(fp == NULL){
+        printf("There was a problem opening the file.\n");
+        break;
+    }
     fwrite(write, 1, strlen(write), fp);
     fclose(fp);
 }
