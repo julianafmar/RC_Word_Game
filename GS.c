@@ -265,7 +265,10 @@ void start(char plid[], char word_file[], char buffer[], int line_number){
     sprintf(game_file, "GAME_%s.txt", plid);
     if(access(game_file, F_OK) == 0){
         FILE *fp = fopen(game_file, "r");
-        if(fp == NULL) exit(1);
+        if(fp == NULL){
+            printf("There was a problem opening a file.\n");
+            return;
+        }
 
         int i = 0;
         for(; fgets(line, sizeof(line), fp) != NULL && i <= MAX_LINES; i++){
@@ -289,11 +292,14 @@ void start(char plid[], char word_file[], char buffer[], int line_number){
     }
     else{
         FILE *fp = fopen(word_file, "r");
-        if(fp == NULL) exit(1);
+        if(fp == NULL){
+            printf("There was a problem opening a file.\n");
+            return;
+        }
 
         char line[50];
         for(int i = 0; fgets(line, sizeof(line), fp) != NULL && i <= MAX_LINES; i++){
-            if((i % MAX_LINES) == line_number){
+            if((line_number % MAX_LINES) == i){
                 sscanf(line, "%s", word);
                 break;
             }
@@ -338,7 +344,10 @@ void play(char plid[], char letter, int trial){
     }
     
     FILE *fp = fopen(game_file, "rw");
-    if(fp == NULL) exit(1);
+    if(fp == NULL){
+        printf("There was a problem opening a file.\n");
+        return;
+    }
     
     char line[50];
     fgets(line, sizeof(line), fp);
@@ -454,7 +463,10 @@ void rev(char plid[]){
     char word[31], file[24], line[50], send[40];
     sprintf(file, "GAME_%s.txt", plid);
     FILE *fp = fopen(file, "r");
-    if(fp == NULL) exit(1);
+    if(fp == NULL){
+        printf("There was a problem opening a file.\n");
+        return;
+    }
     fgets(line, sizeof(line), fp);
     sscanf(line, "%s", word);
     sprintf(send, "RRV %s\n", word);
@@ -497,7 +509,10 @@ void scoreboard(int pid){
 
         sprintf(aux, "SCORES/%s", player_score[i]->d_name);
         FILE *fp = fopen(aux, "r");
-        if(fp == NULL) exit(1);
+        if(fp == NULL){
+            printf("There was a problem opening a file.\n");
+            return;
+        }
         fgets(pl_line, sizeof(pl_line), fp);
         sscanf(pl_line, "%d %d %s %d %d", &score, &plid, word, &n_succ, &n_trials);
         fclose(fp);
@@ -542,7 +557,10 @@ void guess(char plid[], char guess_word[], int trial){
     }
     
     FILE *fp = fopen(game_file, "rw");
-    if(fp == NULL) exit(1);
+    if(fp == NULL){
+        printf("There was a problem opening a file.\n");
+        return;
+    }
     char line[50];
     fgets(line, sizeof(line), fp);
     sscanf(line, "%s", word);
@@ -640,7 +658,10 @@ void quit(char plid[]){
     }
     else{
         FILE *fp = fopen(game_file, "r");
-        if(fp == NULL) exit(1);
+        if(fp == NULL){
+            printf("There was a problem opening a file.\n");
+            return;
+        }
 
         char line[50];
         int i = 0;
@@ -679,7 +700,10 @@ void hint(char plid[]){
     }
 
     FILE *fp = fopen(game_file, "r");
-    if(fp == NULL) exit(1);
+    if(fp == NULL){
+        printf("There was a problem opening a file.\n");
+        return;
+    }
 
     char line[60];
     fgets(line, sizeof(line), fp);
@@ -688,7 +712,10 @@ void hint(char plid[]){
 
     sprintf(path_file, "HINTS/%s", file_name);
     fp = fopen(path_file, "r");
-    if(fp == NULL) exit(1);
+    if(fp == NULL){
+        printf("There was a problem opening a file.\n");
+        return;
+    }
 
     fseek(fp, 0L, SEEK_END);
     size = ftell(fp);
@@ -729,7 +756,10 @@ void state(char plid[]){
         else{
             sprintf(Fname, "%s%s", path, player_score[m-1]->d_name);
             fp = fopen(Fname, "r");
-            if(fp == NULL) exit(1);
+            if(fp == NULL){
+                printf("There was a problem opening a file.\n");
+                return;
+            }
 
             char code, wl[30];
             int count_words = 0, count_letters = 0, word_size = 0;
@@ -803,7 +833,10 @@ void state(char plid[]){
     }
     else{
         fp = fopen(game_file, "r");
-        if(fp == NULL) exit(1);
+        if(fp == NULL){
+            printf("There was a problem opening a file.\n");
+            return;
+        }
         int n_trues = 0, n_falses = 0;
         char code, wl[30];
         int count_words = 0, count_letters = 0, word_size = 0;
@@ -831,19 +864,27 @@ void state(char plid[]){
         }
         int transactions = i-1;
 
-        int size = 36 + 25 + 23*(n_trues+n_falses) + count_words*transactions + transactions + word_size + 15 + strlen(word);
+        int size = 36 + 24 + 23*(n_trues+n_falses) + count_words*transactions + transactions + word_size + 15 + strlen(word);
 
         sprintf(Fname, "STATE_%s.txt", plid);
         char aux[5];
         sprintf(aux, "%d", size);
         sprintf(send, "RST ACT %s %d\n", Fname, size);
+        send[strlen(aux)+strlen(Fname)+10] = '\0';
         tcpSendToClient(send, strlen(send));
+        memset(send, 0, strlen(send));
 
         sprintf(send, "\nActive game found for player %s\n", plid);
+        send[37] = '\0';
         tcpSendToClient(send, strlen(send));
+        memset(send, 0, strlen(send));
 
         sprintf(send, "Transactions found: %d\n", transactions);
+        memset(aux, 0, strlen(aux));
+        sprintf(aux, "%d", transactions);
+        send[strlen(aux)+21] = '\0';
         tcpSendToClient(send, strlen(send));
+        memset(send, 0, strlen(send));
 
         fseek(fp, 0, SEEK_SET);
         char word_so_far[WORD_SIZE];
@@ -857,8 +898,12 @@ void state(char plid[]){
                 sscanf(line, "%c %s", &code, wl);
                 if (code == 'T'){
                     if(strstr(word, wl)){
+                        wl[1] = '\0';
                         sprintf(send, "Letter trial: %s - TRUE\n", wl);
+                        send[23] = '\0';
+                        printf("senddd %s\n", send);
                         tcpSendToClient(send, strlen(send));
+                        memset(send, 0, strlen(send));
                         for(int j = 0; j < strlen(word); j++){
                             char *let = wl;
                             if(word[j] == *let){
@@ -868,16 +913,19 @@ void state(char plid[]){
                     }
                     else{
                         sprintf(send, "Letter trial: %s - FALSE\n", wl);
+                        send[24] = '\0';
                         tcpSendToClient(send, strlen(send));
+                        memset(send, 0, strlen(send));
                     }
                 }
                 else if(code == 'G'){
                     sprintf(send, "Word guess: %s - FALSE\n", wl);
+                    send[strlen(wl)+20] = '\0';
                     tcpSendToClient(send, strlen(send));
+                    memset(send, 0, strlen(send));
                 }
             }
         }
-        
         sprintf(send, "Solved so far: %s\n\n", word_so_far);
         send[17+strlen(word_so_far)] = '\0';
         tcpSendToClient(send, strlen(send));
@@ -900,8 +948,8 @@ int getMaxErrors(int word_len){
 void fileWrite(char file_name[], char write[], char type[]){
     FILE *fp = fopen(file_name, type);
     if(fp == NULL){
-        printf("There was a problem opening the file.\n");
-        break;
+        printf("There was a problem opening a file.\n");
+        return;
     }
     fwrite(write, 1, strlen(write), fp);
     fclose(fp);
@@ -939,7 +987,10 @@ void scoreCreate(int n_succ, int n_wrong, char plid[], char filename[], char wor
     sprintf(scorefile, "SCORES/%03d_%s_%04d%02d%02d_%02d%02d%02d.txt", score, plid, t->tm_year+1900, t->tm_mon+1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
 
     FILE *fp = fopen(scorefile, "w");
-    if(fp == NULL) exit(1);
+    if(fp == NULL){
+        printf("There was a problem opening a file.\n");
+        return;
+    }
     
     char write[30];
     sprintf(write, "%d %s %s %d %d", score, plid, word, n_succ, total_trials);
@@ -954,6 +1005,5 @@ void verbosePrint(char plid[], char command[]){
     else{
         if(strcmp("sb", plid) != 0) printf("\n\nCommand: %s\nIP: %s\nPort: %s\n", command, host, service);
         else printf("\n\nPlayer ID: %s\nCommand: %s\nIP: %s\nPort: %s\n", plid, command, host, service);
-    } 
-
+    }
 }
