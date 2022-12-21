@@ -311,7 +311,10 @@ void received_tcp(char *received){
             received += strlen(Fsize) + 1;
 
             FILE *fp = fopen(Fname, "w");
-            if(fp == NULL) exit(1);
+            if(fp == NULL){
+                printf("There was a problem opening a file.\n");
+                return;
+            }
 
             n -= (9 + strlen(Fname) + strlen(Fsize));
             int size = atoi(Fsize);
@@ -327,7 +330,10 @@ void received_tcp(char *received){
             fclose(fp);
 
             fp = fopen(Fname, "r");
-            if(fp == NULL) exit(1);
+            if(fp == NULL){
+                printf("There was a problem opening a file.\n");
+                return;
+            }
             char c = fgetc(fp);
             while(c != EOF){
                 printf("%c", c);
@@ -353,7 +359,10 @@ void received_tcp(char *received){
             received += strlen(Fsize) + 1;
         
             FILE *fp = fopen(Fname, "w");
-            if(fp == NULL) exit(1);
+            if(fp == NULL){
+                printf("There was a problem opening a file.\n");
+                return;
+            }
             n = n - (9 + strlen(Fname) + strlen(Fsize));
             int size = atoi(Fsize);
             size -= n;
@@ -387,7 +396,10 @@ void received_tcp(char *received){
             printf("The filename is %s and its size is %s. File's content is:\n", Fname, Fsize);
             
             FILE *fp = fopen(Fname, "w");
-            if(fp == NULL) exit(1);
+            if(fp == NULL){
+                printf("There was a problem opening a file.\n");
+                return;
+            }
 
             n -= (9 + strlen(Fname) + strlen(Fsize));
             int size = atoi(Fsize);
@@ -405,7 +417,10 @@ void received_tcp(char *received){
             fclose(fp);
 
             fp = fopen(Fname, "r");
-            if(fp == NULL) exit(1);
+            if(fp == NULL){
+                printf("There was a problem opening a file.\n");
+                return;
+            }
             char c = fgetc(fp);
             int x = 0;
             while(c != EOF){
@@ -426,7 +441,10 @@ void received_tcp(char *received){
             printf("The filename is %s and its size is %s. File's content is:\n", Fname, Fsize);
 
             FILE *fp = fopen(Fname, "w");
-            if(fp == NULL) exit(1);
+            if(fp == NULL){
+                printf("There was a problem opening a file.\n");
+                return;
+            }
 
             n -= (9 + strlen(Fname) + strlen(Fsize));
             int size = atoi(Fsize);
@@ -436,13 +454,19 @@ void received_tcp(char *received){
                 n = read(tcp_fd, buffer, 128);
                 buffer[129] = '\0';
                 fwrite(buffer, 1, n, fp);
-                if(n == -1) exit(1);
+                if(fp == NULL){
+                    printf("There was a problem opening a file.\n");
+                    return;
+                }
                 size -= n;
             }
             fclose(fp);
 
             fp = fopen(Fname, "r");
-            if(fp == NULL) exit(1);
+            if(fp == NULL){
+                printf("There was a problem opening a file.\n");
+                return;
+            }
             char c = fgetc(fp);
             while(c != EOF){
                 printf("%c", c);

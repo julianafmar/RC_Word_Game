@@ -122,7 +122,7 @@ int main(int argc, char *argv[]){
         if(n == -1) exit(1);
         if(listen(tcp_fd, 5) == -1) exit(1);
 
-        //timeout -------------
+        /*timeout -------------
         struct timeval timeout;      
         timeout.tv_sec = 600;
         timeout.tv_usec = 0;
@@ -132,7 +132,7 @@ int main(int argc, char *argv[]){
 
         if (setsockopt (udp_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout) < 0) printf("setsockopt failed\n");
         if (setsockopt (udp_fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof timeout) < 0) printf("setsockopt failed\n");
-        //---------------------
+        ---------------------*/
 
         if ((pid = fork()) == 0){
             //UDP
@@ -480,7 +480,6 @@ void scoreboard(int pid){
     struct dirent **player_score;
     int m =  scandir("SCORES/", &player_score, NULL, alphasort);
     if(m < 0) perror("scandir");
-    if(m > 12) m = 12;
     
     if(m == 2){
         sprintf(send, "RSB EMPTY\n");
@@ -503,7 +502,7 @@ void scoreboard(int pid){
     tcpSendToClient(send, strlen(send));
 
     int count = 1;
-    for(int i = (m-1); i >= 2; i--){
+    for(int i = (m-1); count <= 10; i--){
         char pl_line[85], word[31], spaces_1[40], spaces_2[15], aux[263];
         int score, plid, n_succ, n_trials;
 
@@ -901,7 +900,6 @@ void state(char plid[]){
                         wl[1] = '\0';
                         sprintf(send, "Letter trial: %s - TRUE\n", wl);
                         send[23] = '\0';
-                        printf("senddd %s\n", send);
                         tcpSendToClient(send, strlen(send));
                         memset(send, 0, strlen(send));
                         for(int j = 0; j < strlen(word); j++){
