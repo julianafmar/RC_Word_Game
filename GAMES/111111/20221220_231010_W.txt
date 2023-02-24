@@ -1,7 +1,0 @@
-barracuda esox_sphyraena.jpg
-T p
-T a
-T e
-T c
-T r
-G barracuda
